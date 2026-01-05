@@ -1,8 +1,11 @@
 {
+  "id": "escher-financial-manager",
   "name": "Escher Financial Manager",
   "short_name": "Escher",
-  "start_url": ".",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f3f4f6",
   "theme_color": "#4f46e5",
   "description": "Smart Budget Tracker powered by AI",
@@ -10,12 +13,14 @@
     {
       "src": "https://cdn-icons-png.flaticon.com/512/5501/5501360.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "https://cdn-icons-png.flaticon.com/512/5501/5501360.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
