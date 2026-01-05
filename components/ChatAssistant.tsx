@@ -51,7 +51,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
            setMessages(prev => [...prev, { 
              id: crypto.randomUUID(), 
              role: 'system', 
-             text: "System Error: API_KEY is missing from environment variables." 
+             text: "System Error: API_KEY is missing. \n\nIf you are using Vercel, please rename your environment variable to 'VITE_API_KEY' and redeploy." 
            }]);
            return;
         }
@@ -166,7 +166,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     if (!input.trim()) return;
 
     if (!chatRef.current) {
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please ensure API Key is configured in environment variables and refresh." }]);
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please ensure API Key is configured and refresh the page." }]);
         return;
     }
 

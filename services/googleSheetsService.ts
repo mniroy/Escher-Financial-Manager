@@ -47,7 +47,31 @@ export const appendSheetRow = async (user: User, range: string, row: (string | n
 export const saveBudgetToSheet = async (user: User, budgetItems: BudgetLineItem[]) => {
   if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
 
-  // Format data for sheet: Category, Name, Amount, Frequency
+  // 1. Intelligent Detection of Table Bounds
+  // We fetch existing data to find where the "Budget" table actually ends.
+  // We stop counting as soon as we hit a row that doesn't look like a budget item 
+  // (e.g. empty row, or user notes/footers), ensuring we never touch data below.
+  let tableRowCount = 0;
+  try {
+    const currentData = await fetchSheetValues(user, 'Budget!A2:A'); // Only need column A to check categories
+    if (currentData.values && Array.isArray(currentData.values)) {
+        const validCategories = new Set(Object.values(BudgetCategory));
+        
+        for (const row of currentData.values) {
+            const cellValue = row[0];
+            // If cell is empty or NOT a valid category, we assume end of table.
+            if (!cellValue || !validCategories.has(cellValue)) {
+                break;
+            }
+            tableRowCount++;
+        }
+    }
+  } catch (error) {
+     // If fetch fails, proceed with safe default (0 known rows)
+     console.warn("Could not determine table bounds, proceeding with write only.", error);
+  }
+
+  // Format data for sheet
   const rows = budgetItems.map(item => [
     item.category,
     item.name,
@@ -55,53 +79,56 @@ export const saveBudgetToSheet = async (user: User, budgetItems: BudgetLineItem[
     item.frequency
   ]);
 
-  // We perform a batch update: 
-  // 1. Clear existing data (A2:D)
-  // 2. Write new data
-  const updateUrl = `${BASE_URL}/${user.spreadsheetId}/values:batchUpdate`;
-  
-  const response = await fetch(updateUrl, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${user.accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      valueInputOption: 'USER_ENTERED',
-      data: [
-        {
-          range: 'Budget!A2:D', // Overwrite everything after header
-          values: rows
-        }
-      ]
-    }),
-  });
+  // 2. Write New Data
+  if (rows.length > 0) {
+    const writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Budget!A2?valueInputOption=USER_ENTERED`, {
+        method: 'PUT',
+        headers: { 
+            Authorization: `Bearer ${user.accessToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            range: 'Budget!A2',
+            majorDimension: 'ROWS',
+            values: rows
+        })
+    });
 
-  // A better approach for exact syncing:
-  const clearResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Budget!A2:D:clear`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${user.accessToken}` }
-  });
+    if (!writeResponse.ok) {
+        if (writeResponse.status === 401) throw new Error("TOKEN_EXPIRED");
+        const errText = await writeResponse.text();
+        throw new Error(`Failed to update budget sheet: ${errText}`);
+    }
+  }
 
-  if (!clearResponse.ok && clearResponse.status === 401) throw new Error("TOKEN_EXPIRED");
+  // 3. Surgical Cleanup
+  // Only clear rows that were part of the *detected* budget table but are no longer needed.
+  // This leaves everything else (notes, other tables) completely alone.
+  if (tableRowCount > rows.length) {
+    const startClearRow = 2 + rows.length;
+    const endClearRow = 2 + tableRowCount - 1;
+    
+    // We overwrite with empty strings instead of :clear to be gentler on formatting
+    // Calculate how many rows to blank out
+    const rowsToClearCount = endClearRow - startClearRow + 1;
+    const emptyRows = Array(rowsToClearCount).fill(["", "", "", ""]); // Clear A-D
 
-  // Now write
-  const writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Budget!A2:D2?valueInputOption=USER_ENTERED`, { // Start writing at A2
-      method: 'PUT', // or UPDATE via ranges
-      headers: { 
-          Authorization: `Bearer ${user.accessToken}`,
-          'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-          range: 'Budget!A2:D',
-          majorDimension: 'ROWS',
-          values: rows
-      })
-  });
+    const clearResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Budget!A${startClearRow}?valueInputOption=USER_ENTERED`, {
+        method: 'PUT',
+        headers: { 
+            Authorization: `Bearer ${user.accessToken}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            range: `Budget!A${startClearRow}`,
+            majorDimension: 'ROWS',
+            values: emptyRows
+        })
+    });
 
-  if (!writeResponse.ok) {
-      if (writeResponse.status === 401) throw new Error("TOKEN_EXPIRED");
-      throw new Error('Failed to update budget sheet');
+    if (!clearResponse.ok) {
+        console.warn('Failed to clean up stale rows', await clearResponse.text());
+    }
   }
 };
 
