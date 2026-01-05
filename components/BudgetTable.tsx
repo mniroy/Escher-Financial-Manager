@@ -274,30 +274,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
 
   return (
     <div className="space-y-6 pb-20 md:pb-6 relative">
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={() => setIsEditMode(!isEditMode)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-colors border ${
-            isEditMode 
-              ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
-              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          {isEditMode ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
-          {isEditMode ? 'Done' : 'Edit List'}
-        </button>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Add Item
-        </button>
-      </div>
-
-      {/* NEW: Top Summary Card */}
+      {/* Top Summary Card */}
       <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
-        {/* Decorative background element */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
         
         <div className="z-10 text-center md:text-left">
@@ -319,13 +297,35 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
         </div>
       </div>
 
+      {/* Add Item Button - ONLY visible in Edit Mode */}
+      {isEditMode && (
+        <button 
+          onClick={() => handleOpenModal()}
+          className="w-full py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50 transition-colors animate-in fade-in zoom-in"
+        >
+          <Plus className="w-6 h-6" />
+          Add New Budget Item
+        </button>
+      )}
+
       <RenderSection title="Monthly Recurring" items={monthlyItems} type="monthly" />
       <RenderSection title="Yearly Assets & Obligations" items={yearlyItems} type="yearly" />
       
+      {/* Floating Action Button (FAB) for Edit/Done */}
+      <button
+        onClick={() => setIsEditMode(!isEditMode)}
+        className={`fixed bottom-24 right-6 z-40 p-4 rounded-full shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center border border-white/20 ${
+            isEditMode ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white'
+        }`}
+        title={isEditMode ? "Done Editing" : "Edit Plan"}
+      >
+        {isEditMode ? <Check className="w-6 h-6" /> : <Pencil className="w-6 h-6" />}
+      </button>
+
       {/* Edit/Add Modal */}
       {isModalOpen && (
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center"
+          className="fixed inset-0 z-[100] flex items-center justify-center"
           // We set the height of the container to match the Visual Viewport.
           // This ensures that when the keyboard opens (shrinking the visual viewport), 
           // the flex items-center logic recenters the modal in the *remaining* space (above keyboard).
