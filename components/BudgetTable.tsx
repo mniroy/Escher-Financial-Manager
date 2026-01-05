@@ -12,6 +12,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [viewportHeight, setViewportHeight] = useState<string>('100%');
   
   const [formData, setFormData] = useState<BudgetLineItem>({
     category: BudgetCategory.Food,
@@ -20,16 +21,40 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
     frequency: 'Monthly'
   });
 
-  // Prevent background scroll when modal is open
+  // Prevent background scroll and handle visual viewport for keyboard
   useEffect(() => {
     if (isModalOpen) {
       document.body.style.overflow = 'hidden';
+      
+      const handleResize = () => {
+        if (window.visualViewport) {
+          // Use visualViewport height to avoid keyboard covering the modal
+          setViewportHeight(`${window.visualViewport.height}px`);
+        } else {
+          setViewportHeight(`${window.innerHeight}px`);
+        }
+      };
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleResize);
+        // Initial set
+        setViewportHeight(`${window.visualViewport.height}px`);
+      } else {
+        window.addEventListener('resize', handleResize);
+        setViewportHeight(`${window.innerHeight}px`);
+      }
+
+      return () => {
+        document.body.style.overflow = 'unset';
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', handleResize);
+        } else {
+          window.removeEventListener('resize', handleResize);
+        }
+      };
     } else {
       document.body.style.overflow = 'unset';
     }
-    return () => {
-      document.body.style.overflow = 'unset';
-    };
   }, [isModalOpen]);
 
   const handleOpenModal = (index?: number) => {
@@ -270,22 +295,52 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
         </button>
       </div>
 
+      {/* NEW: Top Summary Card */}
+      <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        {/* Decorative background element */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
+        
+        <div className="z-10 text-center md:text-left">
+          <h3 className="text-indigo-200 text-sm font-medium uppercase tracking-wider mb-1">Total Annual Budget</h3>
+          <p className="text-3xl md:text-4xl font-extrabold tracking-tight">{formatCurrency(grandTotal)}</p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 z-10 w-full md:w-auto">
+           <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
+              <p className="text-indigo-200 text-xs mb-1">Annualized Monthly</p>
+              <p className="font-bold text-lg">{formatCurrency(totalMonthly * 12)}</p>
+              <p className="text-[10px] text-indigo-300">({formatCurrency(totalMonthly)} / mo)</p>
+           </div>
+           <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
+              <p className="text-indigo-200 text-xs mb-1">Annual Obligations</p>
+              <p className="font-bold text-lg">{formatCurrency(totalYearly)}</p>
+              <p className="text-[10px] text-indigo-300">(One-off / Yearly items)</p>
+           </div>
+        </div>
+      </div>
+
       <RenderSection title="Monthly Recurring" items={monthlyItems} type="monthly" />
       <RenderSection title="Yearly Assets & Obligations" items={yearlyItems} type="yearly" />
       
-      <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md text-center mx-1">
-        <h3 className="text-lg md:text-xl font-bold mb-2">Total Annual Budget</h3>
-        <p className="text-2xl md:text-3xl font-extrabold tracking-tight break-all">{formatCurrency(grandTotal)}</p>
-        <p className="text-indigo-200 text-xs md:text-sm mt-1">Sum of (Monthly x 12) + Yearly Allocations</p>
-      </div>
-
       {/* Edit/Add Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => {
-            // Close if clicking outside the modal content
-            if (e.target === e.currentTarget) setIsModalOpen(false);
-        }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          // We set the height of the container to match the Visual Viewport.
+          // This ensures that when the keyboard opens (shrinking the visual viewport), 
+          // the flex items-center logic recenters the modal in the *remaining* space (above keyboard).
+          style={{ height: viewportHeight, top: 0 }} 
+        >
+          {/* Backdrop - fixed to screen to cover everything even if viewport shrinks */}
+          <div 
+             className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
+             onClick={() => setIsModalOpen(false)} 
+          />
+          
+          {/* Modal Content - Animated and Centered in the dynamic viewport */}
+          <div 
+             className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[90%] relative z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+          >
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
               <h3 className="text-lg font-bold text-gray-800">
                 {editingIndex !== null ? 'Edit Budget Item' : 'New Budget Item'}
