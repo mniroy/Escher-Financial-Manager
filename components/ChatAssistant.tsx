@@ -47,8 +47,15 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   useEffect(() => {
     const initChat = async () => {
       try {
-        // We assume process.env.API_KEY is available as per environment configuration.
-        // We do not check !process.env.API_KEY explicitly to avoid false positives if the environment handles it differently.
+        if (!process.env.API_KEY) {
+           setMessages(prev => [...prev, { 
+             id: crypto.randomUUID(), 
+             role: 'system', 
+             text: "System Error: API_KEY is missing from environment variables." 
+           }]);
+           return;
+        }
+
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         
         const logExpenseTool: FunctionDeclaration = {
@@ -144,7 +151,6 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         });
       } catch (error: any) {
         console.error("Chat Init Error", error);
-        // We log it to chat so user can see why it failed
         setMessages(prev => [...prev, { 
             id: crypto.randomUUID(), 
             role: 'system', 
@@ -159,9 +165,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    // Guard against uninitialized chat
     if (!chatRef.current) {
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please refresh or check configuration." }]);
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please ensure API Key is configured in environment variables and refresh." }]);
         return;
     }
 

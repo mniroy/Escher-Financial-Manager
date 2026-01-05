@@ -25,17 +25,22 @@ export default function App() {
 
   // 1. Check for existing session and mode on mount
   useEffect(() => {
-    const storedUser = getUserSession();
-    if (storedUser) {
-      setUser(storedUser);
-    }
-    
-    // Load persisted mode
-    const savedMode = getAppMode();
-    setAppMode(savedMode.mode);
-    setActivePlan(savedMode.planName);
+    const initApp = async () => {
+      // User Session
+      const storedUser = getUserSession();
+      if (storedUser) {
+        setUser(storedUser);
+      }
+      
+      // Load persisted mode
+      const savedMode = getAppMode();
+      setAppMode(savedMode.mode);
+      setActivePlan(savedMode.planName);
 
-    setIsInitializing(false);
+      setIsInitializing(false);
+    };
+
+    initApp();
   }, []);
 
   const handleModeChange = (mode: 'standard' | 'yearly', planName: string) => {
