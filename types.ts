@@ -1,3 +1,4 @@
+
 export enum BudgetCategory {
   AssetAquire = 'Asset Aquire',
   Bill = 'Bill',
@@ -34,6 +35,7 @@ export interface Expense {
   amount: number;
   description: string;
   receiptUrl?: string;
+  budgetItemName?: string; // Links to a specific BudgetLineItem name (e.g., "China Trip")
 }
 
 export interface ChartDataPoint {

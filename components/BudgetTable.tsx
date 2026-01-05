@@ -1,19 +1,73 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { formatCurrency } from '../constants';
 import { BudgetCategory, BudgetLineItem } from '../types';
+import { Plus, Pencil, Trash2, X, Save } from 'lucide-react';
 
 interface BudgetTableProps {
   budgetItems: BudgetLineItem[];
+  onUpdateBudget: (items: BudgetLineItem[]) => void;
 }
 
-const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
+const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }) => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  // We use the index in the original array as the ID for editing
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  
+  const [formData, setFormData] = useState<BudgetLineItem>({
+    category: BudgetCategory.Food,
+    name: '',
+    amount: 0,
+    frequency: 'Monthly'
+  });
+
+  const handleOpenModal = (index?: number) => {
+    if (index !== undefined) {
+      setEditingIndex(index);
+      setFormData({ ...budgetItems[index] });
+    } else {
+      setEditingIndex(null);
+      setFormData({
+        category: BudgetCategory.Food,
+        name: '',
+        amount: 0,
+        frequency: 'Monthly'
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!formData.name || formData.amount <= 0) {
+      alert("Please enter a valid name and amount.");
+      return;
+    }
+
+    const newItems = [...budgetItems];
+    if (editingIndex !== null) {
+      // Update
+      newItems[editingIndex] = formData;
+    } else {
+      // Add
+      newItems.push(formData);
+    }
+
+    onUpdateBudget(newItems);
+    setIsModalOpen(false);
+  };
+
+  const handleDelete = (index: number) => {
+    if (window.confirm("Are you sure you want to delete this budget item?")) {
+       const newItems = budgetItems.filter((_, i) => i !== index);
+       onUpdateBudget(newItems);
+    }
+  };
+
   // Group items by category for display
-  const monthlyItems = budgetItems.filter(item => item.frequency === 'Monthly');
-  const yearlyItems = budgetItems.filter(item => item.frequency === 'Yearly');
+  const monthlyItems = budgetItems.map((item, index) => ({...item, originalIndex: index})).filter(item => item.frequency === 'Monthly');
+  const yearlyItems = budgetItems.map((item, index) => ({...item, originalIndex: index})).filter(item => item.frequency === 'Yearly');
 
   const totalMonthly = monthlyItems.reduce((acc, curr) => acc + curr.amount, 0);
   const totalYearly = yearlyItems.reduce((acc, curr) => acc + curr.amount, 0);
-  
   const grandTotal = (totalMonthly * 12) + totalYearly;
 
   const RenderSection = ({ 
@@ -22,11 +76,11 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
     type 
   }: { 
     title: string, 
-    items: BudgetLineItem[], 
+    items: (BudgetLineItem & { originalIndex: number })[], 
     type: 'monthly' | 'yearly' 
   }) => {
     // Group by category
-    const grouped: Record<string, BudgetLineItem[]> = {};
+    const grouped: Record<string, typeof items> = {};
     items.forEach(item => {
       if (!grouped[item.category]) grouped[item.category] = [];
       grouped[item.category].push(item);
@@ -37,13 +91,15 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
 
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
-          <div className="px-4 md:px-6 py-5 border-b border-gray-200 bg-gray-50">
-              <h2 className="text-lg font-bold text-gray-900">{title}</h2>
-              <p className="text-xs md:text-sm text-gray-500 mt-1">
-                {type === 'monthly' 
-                  ? "Recurring expenses (Per Month)" 
-                  : "Annual obligations (Per Year)"}
-              </p>
+          <div className="px-4 md:px-6 py-5 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">{title}</h2>
+                <p className="text-xs md:text-sm text-gray-500 mt-1">
+                  {type === 'monthly' 
+                    ? "Recurring expenses (Per Month)" 
+                    : "Annual obligations (Per Year)"}
+                </p>
+              </div>
           </div>
 
           {/* Desktop Table View */}
@@ -56,18 +112,21 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
                           {type === 'monthly' && (
                             <th className="px-6 py-3 text-right text-xs font-bold text-indigo-600 uppercase tracking-wider">Annualized</th>
                           )}
+                          <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                      {categories.map((cat) => (
+                      {categories.map((cat) => {
+                        const categorySubtotal = grouped[cat].reduce((sum, item) => sum + item.amount, 0);
+                        return (
                         <React.Fragment key={cat}>
                           <tr className="bg-gray-50/50">
-                            <td colSpan={type === 'monthly' ? 3 : 2} className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            <td colSpan={type === 'monthly' ? 4 : 3} className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
                               {cat}
                             </td>
                           </tr>
-                          {grouped[cat].map((item, idx) => (
-                             <tr key={`${cat}-${idx}`} className="hover:bg-gray-50 transition-colors">
+                          {grouped[cat].map((item) => (
+                             <tr key={`${cat}-${item.originalIndex}`} className="group hover:bg-indigo-50/30 transition-colors">
                                 <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 pl-8 border-l-4 border-transparent hover:border-indigo-200">
                                   {item.name}
                                 </td>
@@ -79,10 +138,33 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
                                     {formatCurrency(item.amount * 12)}
                                   </td>
                                 )}
+                                <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                  <button onClick={() => handleOpenModal(item.originalIndex)} className="text-indigo-600 hover:text-indigo-900 mx-2">
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button onClick={() => handleDelete(item.originalIndex)} className="text-red-600 hover:text-red-900 mx-2">
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
                              </tr>
                           ))}
+                          {/* Subtotal Row */}
+                          <tr className="bg-white">
+                                <td className="px-6 py-2 whitespace-nowrap text-xs text-gray-400 text-right font-medium italic">
+                                  Subtotal
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-900 font-bold border-t border-gray-100">
+                                  {formatCurrency(categorySubtotal)}
+                                </td>
+                                {type === 'monthly' && (
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-indigo-400 font-medium border-t border-gray-100">
+                                    {formatCurrency(categorySubtotal * 12)}
+                                  </td>
+                                )}
+                                <td></td>
+                          </tr>
                         </React.Fragment>
-                      ))}
+                      )})}
                       <tr className="bg-indigo-50 font-bold border-t-2 border-indigo-100">
                            <td className="px-6 py-4 whitespace-nowrap text-sm text-indigo-900">Total</td>
                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-indigo-900">
@@ -93,6 +175,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
                                {formatCurrency(sectionTotal * 12)}
                              </td>
                            )}
+                           <td></td>
                       </tr>
                   </tbody>
               </table>
@@ -100,26 +183,42 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
 
           {/* Mobile Card/List View */}
           <div className="md:hidden">
-              {categories.map((cat) => (
+              {categories.map((cat) => {
+                  const categorySubtotal = grouped[cat].reduce((sum, item) => sum + item.amount, 0);
+                  return (
                   <div key={cat} className="border-b border-gray-100 last:border-0">
                       <div className="bg-gray-50/50 px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
                           {cat}
                       </div>
                       <div className="divide-y divide-gray-100">
-                          {grouped[cat].map((item, idx) => (
-                              <div key={`${cat}-${idx}`} className="px-4 py-3 flex justify-between items-center bg-white">
-                                  <span className="text-sm text-gray-900">{item.name}</span>
-                                  <div className="text-right">
-                                      <div className="text-sm font-medium text-gray-900">{formatCurrency(item.amount)}</div>
-                                      {type === 'monthly' && (
-                                          <div className="text-xs text-indigo-600">x12 = {formatCurrency(item.amount * 12)}</div>
+                          {grouped[cat].map((item) => (
+                              <div key={`${cat}-${item.originalIndex}`} className="px-4 py-3 flex justify-between items-center bg-white group">
+                                  <div>
+                                    <span className="text-sm text-gray-900 block">{item.name}</span>
+                                    {type === 'monthly' && (
+                                          <div className="text-[10px] text-gray-400">x12 = {formatCurrency(item.amount * 12)}</div>
                                       )}
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                      <div className="text-sm font-medium text-gray-900">{formatCurrency(item.amount)}</div>
+                                      <div className="flex gap-1">
+                                        <button onClick={() => handleOpenModal(item.originalIndex)} className="p-1.5 text-indigo-600 bg-indigo-50 rounded-md">
+                                            <Pencil className="w-4 h-4" />
+                                        </button>
+                                        <button onClick={() => handleDelete(item.originalIndex)} className="p-1.5 text-red-600 bg-red-50 rounded-md">
+                                            <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
                                   </div>
                               </div>
                           ))}
                       </div>
+                      <div className="bg-gray-50/30 px-4 py-2 flex justify-between items-center text-xs font-medium text-gray-500 border-t border-gray-100">
+                           <span className="italic">Subtotal</span>
+                           <span className="font-bold text-gray-700">{formatCurrency(categorySubtotal)}</span>
+                      </div>
                   </div>
-              ))}
+              )})}
               <div className="bg-indigo-50 px-4 py-4 flex justify-between items-center border-t border-indigo-100">
                   <span className="text-sm font-bold text-indigo-900">Total</span>
                   <span className="text-sm font-bold text-indigo-900">{formatCurrency(sectionTotal)}</span>
@@ -130,7 +229,17 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
   };
 
   return (
-    <div className="space-y-6 pb-20 md:pb-6">
+    <div className="space-y-6 pb-20 md:pb-6 relative">
+      <div className="flex justify-end">
+        <button 
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors"
+        >
+          <Plus className="w-5 h-5" />
+          Add Budget Item
+        </button>
+      </div>
+
       <RenderSection title="Monthly Recurring" items={monthlyItems} type="monthly" />
       <RenderSection title="Yearly Assets & Obligations" items={yearlyItems} type="yearly" />
       
@@ -139,6 +248,83 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems }) => {
         <p className="text-2xl md:text-3xl font-extrabold tracking-tight break-all">{formatCurrency(grandTotal)}</p>
         <p className="text-indigo-200 text-xs md:text-sm mt-1">Sum of (Monthly x 12) + Yearly Allocations</p>
       </div>
+
+      {/* Edit/Add Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-gray-800">
+                {editingIndex !== null ? 'Edit Budget Item' : 'New Budget Item'}
+              </h3>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({...prev, name: e.target.value}))}
+                  placeholder="e.g. Internet Bill"
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3"
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select
+                  value={formData.category}
+                  onChange={(e) => setFormData(prev => ({...prev, category: e.target.value as BudgetCategory}))}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
+                >
+                  {Object.values(BudgetCategory).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500 font-bold text-sm">Rp</span>
+                    <input
+                      type="number"
+                      value={formData.amount}
+                      onChange={(e) => setFormData(prev => ({...prev, amount: Number(e.target.value)}))}
+                      className="pl-9 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+                  <select
+                    value={formData.frequency}
+                    onChange={(e) => setFormData(prev => ({...prev, frequency: e.target.value as 'Monthly' | 'Yearly'}))}
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
+                  >
+                    <option value="Monthly">Monthly</option>
+                    <option value="Yearly">Yearly</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSave}
+                className="w-full mt-4 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center gap-2"
+              >
+                <Save className="w-5 h-5" />
+                Save Item
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

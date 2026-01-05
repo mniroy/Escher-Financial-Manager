@@ -44,6 +44,67 @@ export const appendSheetRow = async (user: User, range: string, row: (string | n
   }
 };
 
+export const saveBudgetToSheet = async (user: User, budgetItems: BudgetLineItem[]) => {
+  if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
+
+  // Format data for sheet: Category, Name, Amount, Frequency
+  const rows = budgetItems.map(item => [
+    item.category,
+    item.name,
+    item.amount,
+    item.frequency
+  ]);
+
+  // We perform a batch update: 
+  // 1. Clear existing data (A2:D)
+  // 2. Write new data
+  const updateUrl = `${BASE_URL}/${user.spreadsheetId}/values:batchUpdate`;
+  
+  const response = await fetch(updateUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${user.accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        {
+          range: 'Budget!A2:D', // Overwrite everything after header
+          values: rows
+        }
+      ]
+    }),
+  });
+
+  // A better approach for exact syncing:
+  const clearResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Budget!A2:D:clear`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${user.accessToken}` }
+  });
+
+  if (!clearResponse.ok && clearResponse.status === 401) throw new Error("TOKEN_EXPIRED");
+
+  // Now write
+  const writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Budget!A2:D2?valueInputOption=USER_ENTERED`, { // Start writing at A2
+      method: 'PUT', // or UPDATE via ranges
+      headers: { 
+          Authorization: `Bearer ${user.accessToken}`,
+          'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+          range: 'Budget!A2:D',
+          majorDimension: 'ROWS',
+          values: rows
+      })
+  });
+
+  if (!writeResponse.ok) {
+      if (writeResponse.status === 401) throw new Error("TOKEN_EXPIRED");
+      throw new Error('Failed to update budget sheet');
+  }
+};
+
 export const parseBudgetFromSheet = (values: any[][]): BudgetLineItem[] => {
   if (!values || values.length <= 1) return []; 
   
@@ -71,7 +132,8 @@ export const parseExpensesFromSheet = (values: any[][]): Expense[] => {
       category: row[2] as BudgetCategory,
       description: row[3],
       amount: isNaN(amountClean) ? 0 : amountClean,
-      receiptUrl: row[5] || undefined
+      receiptUrl: row[5] || undefined,
+      budgetItemName: row[6] || undefined // Read from Column G
     };
   });
 };
