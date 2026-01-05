@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, Tool } from "@google/genai";
 import { MessageCircle, Send, X, Bot, User, Sparkles, ChevronDown } from 'lucide-react';
-import { BudgetCategory, Expense } from '../types';
+import { BudgetCategory, Expense, BudgetLineItem } from '../types';
 
 interface ChatAssistantProps {
   onSaveExpense: (expense: Expense) => void;
+  appMode: 'standard' | 'yearly';
+  activePlanName: string;
+  budgetItems: BudgetLineItem[];
 }
 
 interface Message {
@@ -13,15 +16,22 @@ interface Message {
   text: string;
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ 
+    onSaveExpense,
+    appMode,
+    activePlanName,
+    budgetItems
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { id: 'init', role: 'model', text: "Hi! I'm Papion. Tell me what you spent (e.g., 'Lunch 50k', 'Taxi 25000'), and I'll log it for you." }
+    { id: 'init', role: 'model', text: "Hi! I'm Papion. Tell me what you spent (e.g., 'Lunch 50k'), and I'll log it for you." }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<any>(null);
+
+  const activePlan = budgetItems.find(i => i.name === activePlanName);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,7 +41,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Initialize Chat Session
+  // Re-initialize Chat Session when Mode changes to update System Instruction
   useEffect(() => {
     if (!process.env.API_KEY) return;
 
@@ -67,6 +77,16 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
       };
 
       const tools: Tool[] = [{ functionDeclarations: [logExpenseTool] }];
+      
+      let contextInstruction = "";
+      if (appMode === 'yearly' && activePlan) {
+          contextInstruction = `
+          IMPORTANT MODE ALERT: The user is currently in a special 'Yearly Plan Mode' for event "${activePlan.name}".
+          ALL expenses logged MUST be categorized as "${activePlan.category}" automatically, unless the user strictly specifies otherwise.
+          When calling 'logExpense', set the category to "${activePlan.category}" by default.
+          acknowledge that this is for the "${activePlan.name}" plan in your response.
+          `;
+      }
 
       chatRef.current = ai.chats.create({
         model: 'gemini-3-flash-preview',
@@ -74,6 +94,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
           systemInstruction: `You are Papion, an intelligent financial assistant for the Escher Financial Manager app. 
           Your role is to help users log their expenses quickly through natural language.
           Today's date is ${new Date().toISOString().split('T')[0]}.
+          ${contextInstruction}
           
           Guidelines:
           1. If the user states an expense, extract the details and call the 'logExpense' tool immediately.
@@ -89,7 +110,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
     };
 
     initChat();
-  }, []);
+  }, [appMode, activePlanName, budgetItems]);
 
   const handleSend = async () => {
     if (!input.trim() || !chatRef.current) return;
@@ -117,12 +138,17 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
              const args = call.args as any;
              
              // Construct Expense Object
+             // Force category link if in Yearly Mode
+             const finalCategory = (appMode === 'yearly' && activePlan) ? activePlan.category : (args.category as BudgetCategory);
+             const finalPlanName = (appMode === 'yearly' && activePlan) ? activePlan.name : undefined;
+
              const newExpense: Expense = {
                id: crypto.randomUUID(),
                amount: args.amount,
-               category: args.category as BudgetCategory,
+               category: finalCategory,
                description: args.description,
                date: args.date,
+               budgetItemName: finalPlanName
              };
 
              // Save to App State
@@ -132,7 +158,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
              setMessages(prev => [...prev, { 
                id: crypto.randomUUID(), 
                role: 'system', 
-               text: `✅ Logged: ${args.description} (${args.category}) - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(args.amount)}` 
+               text: `✅ Logged: ${args.description} (${finalCategory}) - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(args.amount)} ${finalPlanName ? `[Plan: ${finalPlanName}]` : ''}` 
              }]);
 
              functionResponses.push({
@@ -248,7 +274,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ onSaveExpense }) => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder="Spent 50k on Coffee..."
+                placeholder={appMode === 'yearly' && activePlan ? `Logging to ${activePlan.name}...` : "Spent 50k on Coffee..."}
                 className="flex-grow bg-gray-100 text-gray-900 rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow text-sm"
                 autoFocus
               />

@@ -2,6 +2,7 @@ import { Expense, User } from '../types';
 
 const STORAGE_KEY = 'budget_app_expenses';
 const USER_SESSION_KEY = 'escher_user_session';
+const APP_MODE_KEY = 'escher_app_mode';
 
 // --- Expenses Storage ---
 
@@ -71,4 +72,21 @@ export const getUserSession = (): User | null => {
 
 export const clearUserSession = (): void => {
   localStorage.removeItem(USER_SESSION_KEY);
+  localStorage.removeItem(APP_MODE_KEY);
+};
+
+// --- App Mode Storage ---
+
+export const saveAppMode = (mode: 'standard' | 'yearly', planName: string) => {
+  localStorage.setItem(APP_MODE_KEY, JSON.stringify({ mode, planName }));
+};
+
+export const getAppMode = (): { mode: 'standard' | 'yearly', planName: string } => {
+  const stored = localStorage.getItem(APP_MODE_KEY);
+  if (!stored) return { mode: 'standard', planName: '' };
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return { mode: 'standard', planName: '' };
+  }
 };

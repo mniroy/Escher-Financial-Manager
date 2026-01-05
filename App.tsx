@@ -5,7 +5,7 @@ import ExpenseLogger from './components/ExpenseLogger';
 import BudgetTable from './components/BudgetTable';
 import ChatAssistant from './components/ChatAssistant';
 import Login from './components/Login';
-import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession } from './services/storageService';
+import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
 import { Expense, BudgetLineItem, User } from './types';
 import { DEFAULT_BUDGET_ITEMS } from './constants';
@@ -19,20 +19,38 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // 1. Check for existing session on mount
+  // Global App Mode State (Persistent)
+  const [appMode, setAppMode] = useState<'standard' | 'yearly'>('standard');
+  const [activePlan, setActivePlan] = useState<string>('');
+
+  // 1. Check for existing session and mode on mount
   useEffect(() => {
     const storedUser = getUserSession();
     if (storedUser) {
       setUser(storedUser);
     }
+    
+    // Load persisted mode
+    const savedMode = getAppMode();
+    setAppMode(savedMode.mode);
+    setActivePlan(savedMode.planName);
+
     setIsInitializing(false);
   }, []);
+
+  const handleModeChange = (mode: 'standard' | 'yearly', planName: string) => {
+    setAppMode(mode);
+    setActivePlan(planName);
+    saveAppMode(mode, planName);
+  };
 
   const handleLogout = () => {
     clearUserSession();
     setUser(null);
     setExpenses([]);
     setBudgetItems(DEFAULT_BUDGET_ITEMS);
+    setAppMode('standard');
+    setActivePlan('');
   };
 
   const loadData = async (currentUser: User) => {
@@ -67,8 +85,10 @@ export default function App() {
   }, [user]);
 
   const handleExpenseSave = async (expense: Expense) => {
+    // Note: We deliberately do not set global 'loading' state here to allow
+    // the ExpenseLogger to perform this in the "background" without blocking the UI.
+    
     if (user) {
-       setLoading(true);
        try {
          const row = [
            expense.id,
@@ -80,17 +100,19 @@ export default function App() {
            expense.budgetItemName || '' // Save the linked plan name
          ];
          await appendSheetRow(user, 'Expenses!A:G', row);
-         await loadData(user);
+         // Reload data silently to update the UI with the new row
+         const expensesData = await fetchSheetValues(user, 'Expenses!A:G');
+         const parsedExpenses = parseExpensesFromSheet(expensesData.values);
+         setExpenses(parsedExpenses);
+         
        } catch (error: any) {
          console.error("Save Error", error);
          if (error.message === 'TOKEN_EXPIRED') {
             alert("Session expired. Please log in again.");
             handleLogout();
          } else {
-            alert("Failed to save to Google Sheet.");
+            console.error("Failed to save to Google Sheet.");
          }
-       } finally {
-         setLoading(false);
        }
     } else {
        // Fallback logic
@@ -160,19 +182,30 @@ export default function App() {
         <Dashboard 
             expenses={expenses} 
             budgetItems={budgetItems} 
-            onSaveExpense={handleExpenseSave} 
+            onSaveExpense={handleExpenseSave}
+            appMode={appMode}
+            activePlan={activePlan}
+            onModeChange={handleModeChange}
         />
       )}
       {activeTab === 'log' && (
         <ExpenseLogger 
             onSave={(e) => { handleExpenseSave(e); setActiveTab('dashboard'); }} 
-            budgetItems={budgetItems} // Pass budget items here
+            budgetItems={budgetItems}
+            appMode={appMode}
+            activePlan={activePlan}
+            onModeChange={handleModeChange}
         />
       )}
       {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} />}
       
       {/* Floating Chat Assistant */}
-      <ChatAssistant onSaveExpense={handleExpenseSave} />
+      <ChatAssistant 
+          onSaveExpense={handleExpenseSave} 
+          appMode={appMode}
+          activePlanName={activePlan}
+          budgetItems={budgetItems}
+      />
     </Layout>
   );
 }

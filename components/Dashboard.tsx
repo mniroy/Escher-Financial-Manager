@@ -3,22 +3,41 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cart
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
 import { exportToCSV } from '../services/storageService';
-import { Download, Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X } from 'lucide-react';
+import { Download, Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, AlertTriangle } from 'lucide-react';
 import ExpenseLogger from './ExpenseLogger';
 
 interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
   onSaveExpense: (expense: Expense) => void;
+  appMode: 'standard' | 'yearly';
+  activePlan: string;
+  onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ expenses, budgetItems, onSaveExpense }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+    expenses, 
+    budgetItems, 
+    onSaveExpense,
+    appMode,
+    activePlan,
+    onModeChange
+}) => {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showLogger, setShowLogger] = useState(false);
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();
+
+  // Filter only Yearly items for the dropdown
+  const yearlyBudgetItems = useMemo(() => {
+    return budgetItems.filter(item => item.frequency === 'Yearly');
+  }, [budgetItems]);
+
+  const activePlanDetails = useMemo(() => {
+      return yearlyBudgetItems.find(i => i.name === activePlan);
+  }, [activePlan, yearlyBudgetItems]);
 
   // Navigation handlers
   const handlePrev = () => {
@@ -101,6 +120,120 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, budgetItems, onSaveExpe
 
   return (
     <div className="space-y-6">
+      
+      {/* GLOBAL MODE SELECTOR */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50">
+             <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide">Expense Logging Context</h2>
+          </div>
+          <div className="p-4">
+              <div className="flex flex-col md:flex-row gap-4">
+                  {/* Standard Mode Button */}
+                  <button 
+                      onClick={() => onModeChange('standard', '')}
+                      className={`flex-1 p-4 rounded-xl border-2 text-left transition-all ${
+                          appMode === 'standard' 
+                          ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200' 
+                          : 'border-gray-100 hover:border-gray-200 bg-white'
+                      }`}
+                  >
+                      <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${appMode === 'standard' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                             <CreditCard className="w-6 h-6" />
+                          </div>
+                          <div>
+                              <div className={`font-bold ${appMode === 'standard' ? 'text-indigo-900' : 'text-gray-700'}`}>Standard Monthly</div>
+                              <div className="text-xs text-gray-500">Regular daily spending</div>
+                          </div>
+                          {appMode === 'standard' && (
+                              <div className="ml-auto">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                      Active
+                                  </span>
+                              </div>
+                          )}
+                      </div>
+                  </button>
+
+                  {/* Yearly Mode Button/Select */}
+                  <div className={`flex-1 rounded-xl border-2 transition-all flex flex-col ${
+                      appMode === 'yearly' 
+                          ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-200' 
+                          : 'border-gray-100 hover:border-gray-200 bg-white'
+                  }`}>
+                      <div 
+                        className="flex-1 p-4 cursor-pointer"
+                        onClick={() => {
+                             if (appMode !== 'yearly') {
+                                 // Default to first item if available
+                                 const defaultPlan = yearlyBudgetItems[0]?.name || '';
+                                 onModeChange('yearly', defaultPlan);
+                             }
+                        }}
+                      >
+                          <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-full ${appMode === 'yearly' ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                                 <Plane className="w-6 h-6" />
+                              </div>
+                              <div className="flex-grow">
+                                  <div className={`font-bold ${appMode === 'yearly' ? 'text-purple-900' : 'text-gray-700'}`}>Event / Trip Mode</div>
+                                  <div className="text-xs text-gray-500">Log to a specific yearly plan</div>
+                              </div>
+                              {appMode === 'yearly' && (
+                                  <div className="ml-auto">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                          Active
+                                      </span>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                      
+                      {/* Dropdown for Yearly Plan */}
+                      {appMode === 'yearly' && (
+                          <div className="px-4 pb-4 animate-in slide-in-from-top-1">
+                              <select 
+                                  value={activePlan}
+                                  onChange={(e) => onModeChange('yearly', e.target.value)}
+                                  className="w-full mt-2 rounded-lg border-purple-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2 px-3 bg-white text-purple-900 font-medium text-sm"
+                              >
+                                  <option value="">-- Select Active Plan --</option>
+                                  {yearlyBudgetItems.map((item, idx) => (
+                                      <option key={idx} value={item.name}>{item.name} ({formatCurrency(item.amount)})</option>
+                                  ))}
+                              </select>
+                              {activePlanDetails && (
+                                  <div className="mt-2 text-xs text-purple-700 bg-white/50 p-2 rounded border border-purple-200">
+                                      Expenses will be logged to category: <strong>{activePlanDetails.category}</strong>
+                                  </div>
+                              )}
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      </div>
+
+      {/* Persistent Mode Banner (Sticky if needed, or just visual reinforcement) */}
+      {appMode === 'yearly' && activePlanDetails && (
+          <div className="bg-purple-600 text-white p-3 rounded-lg shadow-md flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+               <div className="flex items-center gap-2">
+                   <Plane className="w-5 h-5 animate-pulse" />
+                   <span className="font-medium text-sm">
+                       Currently logging all expenses to: <strong>{activePlanDetails.name}</strong>
+                   </span>
+               </div>
+               <button 
+                  onClick={() => onModeChange('standard', '')}
+                  className="bg-white/20 hover:bg-white/30 p-1.5 rounded-full transition-colors"
+                  title="Switch back to Standard Mode"
+               >
+                   <X className="w-4 h-4" />
+               </button>
+          </div>
+      )}
+
+
       {/* Quick Action: Log Expense */}
       {showLogger ? (
         <div className="bg-white rounded-xl shadow-lg border-2 border-indigo-100 overflow-hidden relative animate-in fade-in slide-in-from-top-4 duration-300">
@@ -113,19 +246,31 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, budgetItems, onSaveExpe
               </button>
            </div>
            <div className="p-2">
-             <ExpenseLogger onSave={(e) => {
-               onSaveExpense(e);
-               setShowLogger(false);
-             }} />
+             <ExpenseLogger 
+                onSave={(e) => {
+                    onSaveExpense(e);
+                    setShowLogger(false);
+                }} 
+                budgetItems={budgetItems}
+                appMode={appMode}
+                activePlan={activePlan}
+                onModeChange={onModeChange}
+             />
            </div>
         </div>
       ) : (
         <button
           onClick={() => setShowLogger(true)}
-          className="w-full bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white p-5 rounded-xl shadow-md flex items-center justify-center gap-3 text-xl font-bold transition-all transform hover:scale-[1.01]"
+          className={`w-full p-5 rounded-xl shadow-md flex items-center justify-center gap-3 text-xl font-bold transition-all transform hover:scale-[1.01] ${
+              appMode === 'yearly' 
+              ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+              : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+          }`}
         >
           <Camera className="w-8 h-8" />
-          Input Expense
+          {appMode === 'yearly' && activePlanDetails 
+             ? `Log to ${activePlanDetails.name}` 
+             : "Input Expense"}
         </button>
       )}
 
@@ -270,6 +415,11 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, budgetItems, onSaveExpe
                                         {expense.category}
                                     </span>
                                 </div>
+                                {expense.budgetItemName && (
+                                    <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-100">
+                                        {expense.budgetItemName}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     ))}
@@ -301,9 +451,16 @@ const Dashboard: React.FC<DashboardProps> = ({ expenses, budgetItems, onSaveExpe
                     <tr key={expense.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{expense.date}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                        {expense.category}
-                        </span>
+                        <div className="flex flex-col items-start gap-1">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {expense.category}
+                            </span>
+                            {expense.budgetItemName && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800">
+                                    {expense.budgetItemName}
+                                </span>
+                            )}
+                        </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{expense.description}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900 font-medium">
