@@ -1,9 +1,9 @@
-const CACHE_NAME = 'escher-cache-v4';
+const CACHE_NAME = 'escher-cache-v5';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://cdn-icons-png.flaticon.com/512/5501/5501360.png'
+  'https://cdn-icons-png.flaticon.com/512/1247/1247833.png'
 ];
 
 self.addEventListener('install', (event) => {
