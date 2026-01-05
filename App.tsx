@@ -5,7 +5,7 @@ import ExpenseLogger from './components/ExpenseLogger';
 import BudgetTable from './components/BudgetTable';
 import ChatAssistant from './components/ChatAssistant';
 import Login from './components/Login';
-import { getExpenses, saveExpense as saveLocalExpense } from './services/storageService';
+import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
 import { Expense, BudgetLineItem, User } from './types';
 import { DEFAULT_BUDGET_ITEMS } from './constants';
@@ -17,6 +17,23 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  // 1. Check for existing session on mount
+  useEffect(() => {
+    const storedUser = getUserSession();
+    if (storedUser) {
+      setUser(storedUser);
+    }
+    setIsInitializing(false);
+  }, []);
+
+  const handleLogout = () => {
+    clearUserSession();
+    setUser(null);
+    setExpenses([]);
+    setBudgetItems(DEFAULT_BUDGET_ITEMS);
+  };
 
   const loadData = async (currentUser: User) => {
     setLoading(true);
@@ -36,7 +53,7 @@ export default function App() {
       console.error("Sync Error", error);
       if (error.message === 'TOKEN_EXPIRED') {
         alert("Session expired. Please log in again.");
-        setUser(null);
+        handleLogout();
       }
     } finally {
       setLoading(false);
@@ -68,7 +85,7 @@ export default function App() {
          console.error("Save Error", error);
          if (error.message === 'TOKEN_EXPIRED') {
             alert("Session expired. Please log in again.");
-            setUser(null);
+            handleLogout();
          } else {
             alert("Failed to save to Google Sheet.");
          }
@@ -93,7 +110,7 @@ export default function App() {
           console.error("Budget Save Error", error);
           if (error.message === 'TOKEN_EXPIRED') {
             alert("Session expired. Please log in again.");
-            setUser(null);
+            handleLogout();
          } else {
             alert("Failed to update budget in Google Sheets.");
             // Revert changes by reloading
@@ -104,8 +121,20 @@ export default function App() {
       }
   };
 
+  // Show a blank screen or spinner while checking local storage to prevent login flicker
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
   if (!user) {
-    return <Login onLoginSuccess={setUser} />;
+    return <Login onLoginSuccess={(u) => {
+      saveUserSession(u);
+      setUser(u);
+    }} />;
   }
 
   if (loading && expenses.length === 0 && budgetItems.length === 0) {
@@ -125,7 +154,7 @@ export default function App() {
       setActiveTab={setActiveTab} 
       onRefresh={() => loadData(user)}
       user={user}
-      onLogout={() => setUser(null)}
+      onLogout={handleLogout}
     >
       {activeTab === 'dashboard' && (
         <Dashboard 

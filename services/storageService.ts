@@ -1,6 +1,9 @@
-import { Expense } from '../types';
+import { Expense, User } from '../types';
 
 const STORAGE_KEY = 'budget_app_expenses';
+const USER_SESSION_KEY = 'escher_user_session';
+
+// --- Expenses Storage ---
 
 export const getExpenses = (): Expense[] => {
   const stored = localStorage.getItem(STORAGE_KEY);
@@ -46,4 +49,26 @@ export const exportToCSV = (): void => {
     link.click();
     document.body.removeChild(link);
   }
+};
+
+// --- User Session Storage ---
+
+export const saveUserSession = (user: User): void => {
+  localStorage.setItem(USER_SESSION_KEY, JSON.stringify(user));
+};
+
+export const getUserSession = (): User | null => {
+  const stored = localStorage.getItem(USER_SESSION_KEY);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored);
+  } catch (e) {
+    console.error("Failed to parse user session", e);
+    localStorage.removeItem(USER_SESSION_KEY);
+    return null;
+  }
+};
+
+export const clearUserSession = (): void => {
+  localStorage.removeItem(USER_SESSION_KEY);
 };

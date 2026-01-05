@@ -1,7 +1,8 @@
-import React, { useState, useRef, useMemo } from 'react';
-import { Camera, Upload, Loader2, Save, X, CalendarClock, CreditCard } from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { Camera, Upload, Loader2, Save, X, CalendarClock, CreditCard, Plane } from 'lucide-react';
 import { fileToGenerativePart, analyzeReceipt } from '../services/geminiService';
 import { BudgetCategory, Expense, BudgetLineItem } from '../types';
+import { formatCurrency } from '../constants';
 
 interface ExpenseLoggerProps {
     onSave: (expense: Expense) => void;
@@ -11,8 +12,11 @@ interface ExpenseLoggerProps {
 const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] }) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [expenseType, setExpenseType] = useState<'standard' | 'yearly_plan'>('standard');
   
+  // Persistent Mode State
+  const [mode, setMode] = useState<'standard' | 'yearly'>('standard');
+  const [selectedPlanName, setSelectedPlanName] = useState<string>('');
+
   const [manualForm, setManualForm] = useState<Partial<Expense>>({
     category: BudgetCategory.Food,
     date: new Date().toISOString().split('T')[0],
@@ -27,6 +31,30 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
   const yearlyBudgetItems = useMemo(() => {
     return budgetItems.filter(item => item.frequency === 'Yearly');
   }, [budgetItems]);
+
+  // Derived active plan based on selection
+  const activeYearlyPlan = useMemo(() => {
+    if (mode === 'yearly' && selectedPlanName) {
+      return budgetItems.find(i => i.name === selectedPlanName);
+    }
+    return null;
+  }, [mode, selectedPlanName, budgetItems]);
+
+  // Effect: When active plan changes, auto-update the category/context
+  useEffect(() => {
+      if (activeYearlyPlan) {
+          setManualForm(prev => ({
+              ...prev,
+              category: activeYearlyPlan.category,
+              budgetItemName: activeYearlyPlan.name
+          }));
+      } else if (mode === 'standard') {
+          setManualForm(prev => ({
+              ...prev,
+              budgetItemName: undefined
+          }));
+      }
+  }, [activeYearlyPlan, mode]);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -44,10 +72,11 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
         setManualForm(prev => ({
           ...prev,
           amount: result.amount,
-          // Only overwrite category if in standard mode, otherwise keep the planned category
-          category: expenseType === 'standard' ? (result.category as BudgetCategory) : prev.category, 
+          // Only overwrite category if NOT in yearly mode. If in yearly mode, we trust the plan's category.
+          category: activeYearlyPlan ? activeYearlyPlan.category : (result.category as BudgetCategory), 
           date: result.date || new Date().toISOString().split('T')[0],
-          description: result.merchant || 'Receipt Expense'
+          description: result.merchant || 'Receipt Expense',
+          budgetItemName: activeYearlyPlan ? activeYearlyPlan.name : undefined
         }));
       } catch (error) {
         console.error(error);
@@ -64,8 +93,8 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
       return;
     }
 
-    if (expenseType === 'yearly_plan' && !manualForm.budgetItemName) {
-        alert("Please select a specific yearly plan.");
+    if (mode === 'yearly' && !activeYearlyPlan) {
+        alert("Please select a specific yearly plan to log this expense against.");
         return;
     }
 
@@ -76,72 +105,97 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
       date: manualForm.date!,
       description: manualForm.description || 'Expense',
       receiptUrl: imagePreview || undefined,
-      budgetItemName: expenseType === 'yearly_plan' ? manualForm.budgetItemName : undefined
+      budgetItemName: activeYearlyPlan ? activeYearlyPlan.name : undefined
     };
 
     onSave(newExpense);
     
-    // Reset
-    handleClear();
+    // Reset Form Fields only, keep the mode active
+    handleClearFormFields();
   };
 
-  const handleClear = () => {
+  const handleClearFormFields = () => {
     setImagePreview(null);
-    setManualForm({
-      category: BudgetCategory.Food,
+    setManualForm(prev => ({
+      category: activeYearlyPlan ? activeYearlyPlan.category : BudgetCategory.Food,
       date: new Date().toISOString().split('T')[0],
       amount: 0,
       description: '',
-      budgetItemName: undefined
-    });
-    setExpenseType('standard');
+      budgetItemName: activeYearlyPlan ? activeYearlyPlan.name : undefined
+    }));
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleYearlyItemChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const selectedName = e.target.value;
-      if (!selectedName) {
-          setManualForm(prev => ({...prev, budgetItemName: undefined}));
-          return;
-      }
-
-      const selectedItem = yearlyBudgetItems.find(i => i.name === selectedName);
-      if (selectedItem) {
-          setManualForm(prev => ({
-              ...prev,
-              budgetItemName: selectedItem.name,
-              category: selectedItem.category, // Auto-lock category to the plan
-              description: prev.description || selectedItem.name // Helpful default
-          }));
-      }
   };
 
   return (
     <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+      
+      {/* Global Mode Selector */}
+      <div className="border-b border-gray-100">
+          <div className="flex">
+              <button 
+                  onClick={() => setMode('standard')} 
+                  className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                      mode === 'standard' 
+                          ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600' 
+                          : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+              >
+                 <CreditCard size={18} /> 
+                 <span>Regular Spending</span>
+              </button>
+              <button 
+                  onClick={() => setMode('yearly')} 
+                  className={`flex-1 p-4 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
+                      mode === 'yearly' 
+                          ? 'bg-purple-50 text-purple-700 border-b-2 border-purple-600' 
+                          : 'text-gray-500 hover:bg-gray-50'
+                  }`}
+              >
+                 <Plane size={18} /> 
+                 <span>Event / Trip Mode</span>
+              </button>
+          </div>
+          
+          {/* Active Plan Selector Panel */}
+          {mode === 'yearly' && (
+              <div className="p-4 bg-purple-50 border-b border-purple-100 animate-in slide-in-from-top-2">
+                  <label className="block text-xs font-bold text-purple-900 uppercase tracking-wide mb-2">Select Active Event Plan</label>
+                  <select 
+                      value={selectedPlanName}
+                      onChange={(e) => setSelectedPlanName(e.target.value)}
+                      className="w-full rounded-lg border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2.5 px-3 bg-white text-purple-900 font-medium"
+                  >
+                      <option value="">-- Select an Event (e.g. Vacation) --</option>
+                      {yearlyBudgetItems.map((item, idx) => (
+                          <option key={idx} value={item.name}>{item.name} ({formatCurrency(item.amount)})</option>
+                      ))}
+                  </select>
+                  
+                  {activeYearlyPlan ? (
+                       <div className="mt-3 flex items-start gap-2 text-xs text-purple-800 bg-white/50 p-2 rounded-md border border-purple-100">
+                           <span className="relative flex h-2 w-2 mt-1">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                           </span>
+                           <div>
+                               <strong>Mode Active:</strong> All expenses entered below will be logged under <strong>"{activeYearlyPlan.name}"</strong> ({activeYearlyPlan.category}).
+                           </div>
+                       </div>
+                  ) : (
+                      <p className="text-xs text-purple-600 mt-2 italic">Please select a plan to start logging.</p>
+                  )}
+              </div>
+          )}
+      </div>
+
       <div className="p-6">
-        <h2 className="text-2xl font-bold mb-4 text-gray-800">Input Expense</h2>
-        
-        {/* Toggle Type */}
-        <div className="flex bg-gray-100 p-1 rounded-lg mb-6">
-            <button 
-                onClick={() => setExpenseType('standard')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${
-                    expenseType === 'standard' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
-            >
-                <CreditCard className="w-4 h-4" />
-                Standard
-            </button>
-            <button 
-                onClick={() => setExpenseType('yearly_plan')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all ${
-                    expenseType === 'yearly_plan' ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
-            >
-                <CalendarClock className="w-4 h-4" />
-                From Yearly Plan
-            </button>
-        </div>
+        <h2 className="text-xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+            {activeYearlyPlan ? (
+                <>Logging to: <span className="text-purple-600 underline decoration-dotted">{activeYearlyPlan.name}</span></>
+            ) : (
+                "Log Expense"
+            )}
+        </h2>
 
         {/* Upload Area */}
         <div className="mb-8">
@@ -158,24 +212,34 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
             <div className="grid grid-cols-2 gap-4">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-indigo-200 rounded-lg bg-indigo-50 hover:bg-indigo-100 transition-colors"
+                disabled={mode === 'yearly' && !activeYearlyPlan}
+                className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg transition-colors ${
+                    mode === 'yearly' && !activeYearlyPlan 
+                    ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                    : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100'
+                }`}
               >
-                <Camera className="w-8 h-8 text-indigo-600 mb-2" />
-                <span className="text-sm font-medium text-indigo-900">Snap Receipt</span>
+                <Camera className={`w-8 h-8 mb-2 ${mode === 'yearly' && !activeYearlyPlan ? 'text-gray-300' : 'text-indigo-600'}`} />
+                <span className={`text-sm font-medium ${mode === 'yearly' && !activeYearlyPlan ? 'text-gray-400' : 'text-indigo-900'}`}>Snap Receipt</span>
               </button>
               <button
                  onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                 disabled={mode === 'yearly' && !activeYearlyPlan}
+                className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg transition-colors ${
+                    mode === 'yearly' && !activeYearlyPlan 
+                    ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                    : 'border-gray-200 bg-gray-50 hover:bg-gray-100'
+                }`}
               >
-                <Upload className="w-8 h-8 text-gray-500 mb-2" />
-                <span className="text-sm font-medium text-gray-700">Upload File</span>
+                <Upload className={`w-8 h-8 mb-2 ${mode === 'yearly' && !activeYearlyPlan ? 'text-gray-300' : 'text-gray-500'}`} />
+                <span className={`text-sm font-medium ${mode === 'yearly' && !activeYearlyPlan ? 'text-gray-400' : 'text-gray-700'}`}>Upload File</span>
               </button>
             </div>
           ) : (
             <div className="relative rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
               <img src={imagePreview} alt="Receipt Preview" className="max-h-full max-w-full object-contain" />
               <button 
-                onClick={handleClear}
+                onClick={handleClearFormFields}
                 className="absolute top-2 right-2 bg-white/80 p-1 rounded-full text-gray-800 hover:bg-white"
               >
                 <X className="w-5 h-5" />
@@ -191,28 +255,8 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
         </div>
 
         {/* Edit Form */}
-        <div className="space-y-4">
+        <div className={`space-y-4 ${mode === 'yearly' && !activeYearlyPlan ? 'opacity-50 pointer-events-none' : ''}`}>
           
-          {/* Yearly Plan Selector */}
-          {expenseType === 'yearly_plan' && (
-              <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100 animate-in slide-in-from-top-2">
-                  <label className="block text-sm font-bold text-indigo-900 mb-1">Select Plan Allocation</label>
-                  <select
-                    value={manualForm.budgetItemName || ''}
-                    onChange={handleYearlyItemChange}
-                    className="w-full rounded-md border-indigo-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 border px-3 bg-white"
-                  >
-                      <option value="">-- Choose a Yearly Budget Item --</option>
-                      {yearlyBudgetItems.map((item, idx) => (
-                          <option key={idx} value={item.name}>{item.name} (Budget: {new Intl.NumberFormat('id-ID', {style: 'currency', currency:'IDR', maximumFractionDigits: 0}).format(item.amount)})</option>
-                      ))}
-                  </select>
-                  <p className="text-xs text-indigo-600 mt-1">
-                      Expense will be logged under <strong>{manualForm.category || '...'}</strong>
-                  </p>
-              </div>
-          )}
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
             <div className="relative">
@@ -230,9 +274,9 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
             <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
             <select
               value={manualForm.category}
-              disabled={expenseType === 'yearly_plan'} // Disable editing category if tied to a plan
+              disabled={!!activeYearlyPlan} // Always disable if a plan is active (it locks the category)
               onChange={(e) => setManualForm(prev => ({ ...prev, category: e.target.value as BudgetCategory }))}
-              className={`w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 border px-3 bg-white ${expenseType === 'yearly_plan' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+              className={`w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 border px-3 bg-white ${activeYearlyPlan ? 'bg-gray-100 text-gray-500 cursor-lock' : ''}`}
             >
               {Object.values(BudgetCategory).map((cat) => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -265,10 +309,14 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({ onSave, budgetItems = [] 
           <button
             onClick={handleSave}
             disabled={isAnalyzing}
-            className="w-full mt-6 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center gap-2"
+            className={`w-full mt-6 text-white py-3 px-4 rounded-lg font-medium shadow-sm flex items-center justify-center gap-2 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                activeYearlyPlan 
+                ? 'bg-purple-600 hover:bg-purple-700 focus:ring-purple-500' 
+                : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500'
+            }`}
           >
             <Save className="w-5 h-5" />
-            Save Expense
+            {activeYearlyPlan ? `Log to ${activeYearlyPlan.name}` : 'Save Expense'}
           </button>
         </div>
       </div>
