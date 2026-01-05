@@ -88,7 +88,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
            </div>
         </div>
         
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Escher</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">Escher Financial Manager</h1>
         <p className="text-gray-500 mb-10">Your AI Financial Companion</p>
 
         {isLoading ? (

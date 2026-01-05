@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { formatCurrency } from '../constants';
 import { BudgetCategory, BudgetLineItem } from '../types';
-import { Plus, Pencil, Trash2, X, Save } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Save, Check } from 'lucide-react';
 
 interface BudgetTableProps {
   budgetItems: BudgetLineItem[];
@@ -10,8 +10,8 @@ interface BudgetTableProps {
 
 const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  // We use the index in the original array as the ID for editing
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   
   const [formData, setFormData] = useState<BudgetLineItem>({
     category: BudgetCategory.Food,
@@ -19,6 +19,18 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
     amount: 0,
     frequency: 'Monthly'
   });
+
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isModalOpen]);
 
   const handleOpenModal = (index?: number) => {
     if (index !== undefined) {
@@ -88,6 +100,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
 
     const categories = Object.keys(grouped) as BudgetCategory[];
     const sectionTotal = items.reduce((sum, i) => sum + i.amount, 0);
+    const colSpanCount = type === 'monthly' ? (isEditMode ? 4 : 3) : (isEditMode ? 3 : 2);
 
     return (
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
@@ -112,7 +125,9 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
                           {type === 'monthly' && (
                             <th className="px-6 py-3 text-right text-xs font-bold text-indigo-600 uppercase tracking-wider">Annualized</th>
                           )}
-                          <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                          {isEditMode && (
+                            <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                          )}
                       </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -121,7 +136,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
                         return (
                         <React.Fragment key={cat}>
                           <tr className="bg-gray-50/50">
-                            <td colSpan={type === 'monthly' ? 4 : 3} className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                            <td colSpan={colSpanCount} className="px-6 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
                               {cat}
                             </td>
                           </tr>
@@ -138,14 +153,16 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
                                     {formatCurrency(item.amount * 12)}
                                   </td>
                                 )}
-                                <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
-                                  <button onClick={() => handleOpenModal(item.originalIndex)} className="text-indigo-600 hover:text-indigo-900 mx-2">
-                                    <Pencil className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => handleDelete(item.originalIndex)} className="text-red-600 hover:text-red-900 mx-2">
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </td>
+                                {isEditMode && (
+                                  <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium">
+                                    <button onClick={() => handleOpenModal(item.originalIndex)} className="text-indigo-600 hover:text-indigo-900 mx-2">
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button onClick={() => handleDelete(item.originalIndex)} className="text-red-600 hover:text-red-900 mx-2">
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </td>
+                                )}
                              </tr>
                           ))}
                           {/* Subtotal Row */}
@@ -161,7 +178,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
                                     {formatCurrency(categorySubtotal * 12)}
                                   </td>
                                 )}
-                                <td></td>
+                                {isEditMode && <td></td>}
                           </tr>
                         </React.Fragment>
                       )})}
@@ -175,7 +192,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
                                {formatCurrency(sectionTotal * 12)}
                              </td>
                            )}
-                           <td></td>
+                           {isEditMode && <td></td>}
                       </tr>
                   </tbody>
               </table>
@@ -201,14 +218,16 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
                                   </div>
                                   <div className="flex items-center gap-3">
                                       <div className="text-sm font-medium text-gray-900">{formatCurrency(item.amount)}</div>
-                                      <div className="flex gap-1">
-                                        <button onClick={() => handleOpenModal(item.originalIndex)} className="p-1.5 text-indigo-600 bg-indigo-50 rounded-md">
-                                            <Pencil className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => handleDelete(item.originalIndex)} className="p-1.5 text-red-600 bg-red-50 rounded-md">
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                      </div>
+                                      {isEditMode && (
+                                        <div className="flex gap-1 animate-in fade-in slide-in-from-right-4 duration-200">
+                                          <button onClick={() => handleOpenModal(item.originalIndex)} className="p-1.5 text-indigo-600 bg-indigo-50 rounded-md">
+                                              <Pencil className="w-4 h-4" />
+                                          </button>
+                                          <button onClick={() => handleDelete(item.originalIndex)} className="p-1.5 text-red-600 bg-red-50 rounded-md">
+                                              <Trash2 className="w-4 h-4" />
+                                          </button>
+                                        </div>
+                                      )}
                                   </div>
                               </div>
                           ))}
@@ -230,13 +249,24 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
 
   return (
     <div className="space-y-6 pb-20 md:pb-6 relative">
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setIsEditMode(!isEditMode)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-colors border ${
+            isEditMode 
+              ? 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+              : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+          }`}
+        >
+          {isEditMode ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+          {isEditMode ? 'Done' : 'Edit List'}
+        </button>
         <button 
           onClick={() => handleOpenModal()}
           className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors"
         >
           <Plus className="w-5 h-5" />
-          Add Budget Item
+          Add Item
         </button>
       </div>
 
@@ -251,9 +281,12 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
 
       {/* Edit/Add Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200" onClick={(e) => {
+            // Close if clicking outside the modal content
+            if (e.target === e.currentTarget) setIsModalOpen(false);
+        }}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
               <h3 className="text-lg font-bold text-gray-800">
                 {editingIndex !== null ? 'Edit Budget Item' : 'New Budget Item'}
               </h3>
@@ -262,7 +295,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
                 <input

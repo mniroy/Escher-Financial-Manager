@@ -94,7 +94,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
                   <path d="M16 2L28.1 9V23L16 30L3.9 23V9L16 2Z" stroke="#a5b4fc" strokeWidth="2"/>
                   <path d="M16 2V16M16 16L28.1 9M16 16L3.9 9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
-              <span className="ml-2 font-bold text-xl tracking-tight">ESCHER</span>
+              <span className="ml-2 font-bold text-xl tracking-tight hidden md:inline">Escher Financial Manager</span>
+              <span className="ml-2 font-bold text-xl tracking-tight md:hidden">Escher</span>
             </div>
             
             {/* User Profile */}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { Camera, Loader2, CheckCircle2, AlertCircle, X, CreditCard, Plane } from 'lucide-react';
+import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, CreditCard, Plane } from 'lucide-react';
 import { fileToGenerativePart, analyzeReceipt } from '../services/geminiService';
 import { BudgetCategory, Expense, BudgetLineItem } from '../types';
 import { formatCurrency } from '../constants';
@@ -26,7 +26,8 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
     activePlan,
 }) => {
   const [tasks, setTasks] = useState<LogTask[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   // Derived active plan based on global props
   const activeYearlyPlan = useMemo(() => {
@@ -52,7 +53,7 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
       setTasks(prev => [newTask, ...prev]);
 
       // Clear input immediately so user can upload another or leave
-      if (fileInputRef.current) fileInputRef.current.value = '';
+      e.target.value = '';
 
       // 2. Background Process
       try {
@@ -139,39 +140,68 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
 
       <div className="p-6">
         
-        {/* Hidden Input */}
+        {/* Hidden Input for Camera */}
         <input
             type="file"
             accept="image/*"
             capture="environment"
             className="hidden"
-            ref={fileInputRef}
+            ref={cameraInputRef}
+            onChange={handleFileSelect}
+        />
+        
+        {/* Hidden Input for File Upload */}
+        <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={uploadInputRef}
             onChange={handleFileSelect}
         />
 
         {/* TRIGGER AREA */}
-        <div className="grid grid-cols-1 gap-4 mb-6">
+        <div className="grid grid-cols-2 gap-4 mb-6">
+            {/* Camera Button */}
             <div 
-                onClick={() => fileInputRef.current?.click()}
-                className={`group cursor-pointer flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-2xl transition-all ${
+                onClick={() => cameraInputRef.current?.click()}
+                className={`group cursor-pointer flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed rounded-2xl transition-all ${
                     appMode === 'yearly' && !activeYearlyPlan 
                     ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
                     : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 active:scale-95'
                 }`}
                 style={{ pointerEvents: (appMode === 'yearly' && !activeYearlyPlan) ? 'none' : 'auto' }}
             >
-                <div className="bg-white p-4 rounded-full shadow-sm mb-4 group-hover:scale-110 transition-transform">
-                <Camera className={`w-8 h-8 ${appMode === 'yearly' ? 'text-purple-600' : 'text-indigo-600'}`} />
+                <div className="bg-white p-3 md:p-4 rounded-full shadow-sm mb-3 md:mb-4 group-hover:scale-110 transition-transform">
+                  <Camera className={`w-6 h-6 md:w-8 md:h-8 ${appMode === 'yearly' ? 'text-purple-600' : 'text-indigo-600'}`} />
                 </div>
-                <h3 className="text-lg font-bold text-gray-800 mb-1">Tap to Auto-Log</h3>
-                <p className="text-sm text-gray-500 text-center max-w-xs">
-                AI will process receipt in background.<br/>
-                You can close this or take more photos.
+                <h3 className="text-sm md:text-lg font-bold text-gray-800 mb-1">Take Photo</h3>
+            </div>
+
+            {/* Upload Button */}
+            <div 
+                onClick={() => uploadInputRef.current?.click()}
+                className={`group cursor-pointer flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed rounded-2xl transition-all ${
+                    appMode === 'yearly' && !activeYearlyPlan 
+                    ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                    : 'border-indigo-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 active:scale-95'
+                }`}
+                style={{ pointerEvents: (appMode === 'yearly' && !activeYearlyPlan) ? 'none' : 'auto' }}
+            >
+                <div className="bg-indigo-50 p-3 md:p-4 rounded-full shadow-sm mb-3 md:mb-4 group-hover:scale-110 transition-transform">
+                  <Upload className={`w-6 h-6 md:w-8 md:h-8 ${appMode === 'yearly' ? 'text-purple-600' : 'text-indigo-600'}`} />
+                </div>
+                <h3 className="text-sm md:text-lg font-bold text-gray-800 mb-1">Upload File</h3>
+            </div>
+            
+            <div className="col-span-2 text-center">
+                 <p className="text-xs text-gray-500">
+                    AI will process receipt in background.<br/>
+                    You can close this or add more.
                 </p>
             </div>
 
             {appMode === 'yearly' && !activeYearlyPlan && (
-                <div className="bg-orange-50 text-orange-800 p-4 rounded-lg flex items-center gap-3 text-sm">
+                <div className="col-span-2 bg-orange-50 text-orange-800 p-4 rounded-lg flex items-center gap-3 text-sm">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
                     Please select an active Yearly Plan in the Dashboard to start logging expenses for it.
                 </div>
