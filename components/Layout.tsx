@@ -126,7 +126,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
               }`}
             >
               <MessageSquare className="w-4 h-4" />
-              AI Assistant
+              Chat
             </button>
             <button
               onClick={() => setActiveTab('budget')}

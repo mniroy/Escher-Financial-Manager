@@ -45,7 +45,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
   // Re-initialize Chat Session when Mode/Data changes
   useEffect(() => {
-    if (!process.env.API_KEY) return;
+    if (!process.env.API_KEY) {
+      console.warn("API_KEY is missing from environment variables.");
+      return;
+    }
 
     const initChat = async () => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -147,7 +150,13 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   }, [appMode, activePlanName, budgetItems]);
 
   const handleSend = async () => {
-    if (!input.trim() || !chatRef.current) return;
+    if (!input.trim()) return;
+
+    // Guard against uninitialized chat
+    if (!chatRef.current) {
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please ensure API Key is configured." }]);
+        return;
+    }
 
     const userText = input;
     setInput('');
@@ -262,16 +271,17 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
         // Send function results back to model to complete the turn
         if (functionResponses.length > 0) {
-           const nextResponse = await chatRef.current.sendMessage(functionResponses);
+           // Correctly pass function responses using the 'message' parameter
+           const nextResponse = await chatRef.current.sendMessage({ message: functionResponses });
            if (nextResponse.text) {
              setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: nextResponse.text }]);
            }
         }
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Chat Error", error);
-      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Sorry, I encountered an error processing your request." }]);
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: `Error: ${error.message || "Failed to process request"}` }]);
     } finally {
       setIsTyping(false);
     }
