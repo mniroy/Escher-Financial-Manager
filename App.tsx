@@ -39,7 +39,10 @@ export default function App() {
 
       } catch (error) {
         console.error("Failed to sync with Google Sheets", error);
-        alert("Failed to sync with Google Sheets. Check your Settings/Token. Falling back to local data.");
+        // Silent fail on refresh to not annoy user, just log
+        if (expenses.length === 0) {
+             alert("Failed to sync with Google Sheets. Check your Settings/Token. Falling back to local data.");
+        }
         setExpenses(getExpenses()); // Fallback
       } finally {
         setLoading(false);
@@ -108,7 +111,7 @@ export default function App() {
   }
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab}>
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} onRefresh={loadData}>
       {activeTab === 'dashboard' && <Dashboard expenses={expenses} budgetItems={budgetItems} onSaveExpense={handleExpenseSave} />}
       {activeTab === 'log' && <ExpenseLogger onSave={(e) => { handleExpenseSave(e); setActiveTab('dashboard'); }} />}
       {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} />}
