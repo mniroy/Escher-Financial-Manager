@@ -164,7 +164,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       <main 
         ref={contentRef}
         className="flex-grow p-4 md:p-6 w-full max-w-5xl mx-auto transition-transform duration-200 ease-out"
-        style={{ transform: `translateY(${pullDistance}px)` }}
+        style={{ transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : 'none' }}
       >
         {children}
       </main>

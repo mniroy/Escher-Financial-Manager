@@ -135,7 +135,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
                 <p className="text-xs md:text-sm text-gray-500 mt-1">
                   {type === 'monthly' 
                     ? "Recurring expenses (Per Month)" 
-                    : "Annual obligations (Per Year)"}
+                    : "Annual events (Per Year)"}
                 </p>
               </div>
           </div>
@@ -276,6 +276,20 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
     <div className="space-y-6 pb-20 md:pb-6 relative">
       {/* Top Summary Card */}
       <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        
+        {/* Toggle Edit Button in Summary Box */}
+        <button 
+            onClick={() => setIsEditMode(!isEditMode)}
+            className={`absolute top-3 right-3 z-20 p-2 rounded-full transition-all ${
+                isEditMode 
+                ? 'bg-emerald-500 text-white shadow-lg' 
+                : 'bg-white/10 text-indigo-200 hover:bg-white/20 hover:text-white'
+            }`}
+            title={isEditMode ? "Done Editing" : "Edit Plan"}
+        >
+            {isEditMode ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+        </button>
+
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
         
         <div className="z-10 text-center md:text-left">
@@ -290,7 +304,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
               <p className="text-[10px] text-indigo-300">({formatCurrency(totalMonthly)} / mo)</p>
            </div>
            <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
-              <p className="text-indigo-200 text-xs mb-1">Annual Obligations</p>
+              <p className="text-indigo-200 text-xs mb-1">Annual Events</p>
               <p className="font-bold text-lg">{formatCurrency(totalYearly)}</p>
               <p className="text-[10px] text-indigo-300">(One-off / Yearly items)</p>
            </div>
@@ -309,18 +323,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
       )}
 
       <RenderSection title="Monthly Recurring" items={monthlyItems} type="monthly" />
-      <RenderSection title="Yearly Assets & Obligations" items={yearlyItems} type="yearly" />
-      
-      {/* Floating Action Button (FAB) for Edit/Done */}
-      <button
-        onClick={() => setIsEditMode(!isEditMode)}
-        className={`fixed bottom-24 right-6 z-40 p-4 rounded-full shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center justify-center border border-white/20 ${
-            isEditMode ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white'
-        }`}
-        title={isEditMode ? "Done Editing" : "Edit Plan"}
-      >
-        {isEditMode ? <Check className="w-6 h-6" /> : <Pencil className="w-6 h-6" />}
-      </button>
+      <RenderSection title="Yearly Assets & Events" items={yearlyItems} type="yearly" />
 
       {/* Edit/Add Modal */}
       {isModalOpen && (
