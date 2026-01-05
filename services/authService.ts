@@ -1,23 +1,22 @@
 import { User } from '../types';
 
-const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || ''; // You normally need a client ID, but we'll use the token client which works with origins allowed in Cloud Console.
-// NOTE: For this to work in a generic environment without a specific Client ID hardcoded, 
-// we rely on the user configuring their Google Cloud Project and adding the origin.
-// Since we can't assume a Client ID, we will ask the user to input it OR use a simplified implicit flow if they have one.
-// For this demo, we'll assume the standard flow where we request a token.
-
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 
-export const initTokenClient = (callback: (response: any) => void) => {
+export const initTokenClient = (clientId: string, callback: (response: any) => void) => {
   // @ts-ignore
   if (typeof google === 'undefined') return null;
   
-  // @ts-ignore
-  return google.accounts.oauth2.initTokenClient({
-    client_id: '169224424756-3u706176510862086377755606456012.apps.googleusercontent.com', // Demo Client ID - replace with yours in production if needed
-    scope: SCOPES,
-    callback: callback,
-  });
+  try {
+    // @ts-ignore
+    return google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: SCOPES,
+      callback: callback,
+    });
+  } catch (e) {
+    console.error("Error initializing token client", e);
+    return null;
+  }
 };
 
 export const getUserInfo = async (accessToken: string): Promise<Partial<User>> => {
