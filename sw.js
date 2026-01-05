@@ -1,8 +1,9 @@
-const CACHE_NAME = 'escher-cache-v2';
+const CACHE_NAME = 'escher-cache-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json'
+  '/manifest.json',
+  'https://cdn-icons-png.flaticon.com/512/5501/5501360.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -30,16 +31,14 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // 1. Handle External CDNs (esm.sh, tailwind, fonts, icons)
-  // We use a Stale-While-Revalidate strategy here: use cache if available, but update it in background
+  // We use a Stale-While-Revalidate strategy here
   if (url.origin !== self.location.origin) {
      event.respondWith(
        caches.match(event.request).then((cachedResponse) => {
          const fetchPromise = fetch(event.request).then((networkResponse) => {
-            // Check if valid response
             if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'cors' && networkResponse.type !== 'basic' && networkResponse.type !== 'opaque')) {
               return networkResponse;
             }
-            // Clone and cache
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
@@ -55,14 +54,12 @@ self.addEventListener('fetch', (event) => {
 
   // 2. Handle Local Assets
   if (event.request.mode === 'navigate') {
-    // Network First for HTML navigation to ensure fresh app logic
     event.respondWith(
       fetch(event.request).catch(() => {
         return caches.match('/index.html');
       })
     );
   } else {
-    // Cache First for other local assets (JS, CSS chunks)
     event.respondWith(
       caches.match(event.request).then((response) => {
         return response || fetch(event.request);
