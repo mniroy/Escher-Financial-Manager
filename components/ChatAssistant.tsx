@@ -45,105 +45,112 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
   // Re-initialize Chat Session when Mode/Data changes
   useEffect(() => {
-    if (!process.env.API_KEY) {
-      console.warn("API_KEY is missing from environment variables.");
-      return;
-    }
-
     const initChat = async () => {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      
-      const logExpenseTool: FunctionDeclaration = {
-        name: "logExpense",
-        description: "Logs a financial expense. Use this when the user mentions spending money.",
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            amount: { 
-              type: Type.NUMBER, 
-              description: "The numeric amount spent. If user says '50k', convert to 50000. If currency is not specified, assume user's local currency (IDR)." 
+      try {
+        // We assume process.env.API_KEY is available as per environment configuration.
+        // We do not check !process.env.API_KEY explicitly to avoid false positives if the environment handles it differently.
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        const logExpenseTool: FunctionDeclaration = {
+          name: "logExpense",
+          description: "Logs a financial expense. Use this when the user mentions spending money.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              amount: { 
+                type: Type.NUMBER, 
+                description: "The numeric amount spent. If user says '50k', convert to 50000. If currency is not specified, assume user's local currency (IDR)." 
+              },
+              category: {
+                type: Type.STRING,
+                enum: Object.values(BudgetCategory),
+                description: "The budget category."
+              },
+              description: { 
+                type: Type.STRING, 
+                description: "Short description of the item or service." 
+              },
+              date: { 
+                type: Type.STRING, 
+                description: "ISO 8601 date string (YYYY-MM-DD). Use today's date if not specified." 
+              },
             },
-            category: {
-              type: Type.STRING,
-              enum: Object.values(BudgetCategory),
-              description: "The budget category."
-            },
-            description: { 
-              type: Type.STRING, 
-              description: "Short description of the item or service." 
-            },
-            date: { 
-              type: Type.STRING, 
-              description: "ISO 8601 date string (YYYY-MM-DD). Use today's date if not specified." 
-            },
+            required: ["amount", "category", "description", "date"],
           },
-          required: ["amount", "category", "description", "date"],
-        },
-      };
+        };
 
-      const searchExpensesTool: FunctionDeclaration = {
-        name: "searchExpenses",
-        description: "Searches the user's transaction history. Use this when the user asks 'How much did I spend on X?' or 'Did I buy Y?'.",
-        parameters: {
-          type: Type.OBJECT,
-          properties: {
-            searchTerm: {
-               type: Type.STRING,
-               description: "Keywords to match in description (e.g. 'Coffee', 'Uber'). Optional."
-            },
-            category: {
-              type: Type.STRING,
-              enum: Object.values(BudgetCategory),
-              description: "Filter by category. Optional."
-            },
-            month: {
-              type: Type.NUMBER,
-              description: "Filter by month number (0-11) where 0 is January. Optional."
+        const searchExpensesTool: FunctionDeclaration = {
+          name: "searchExpenses",
+          description: "Searches the user's transaction history. Use this when the user asks 'How much did I spend on X?' or 'Did I buy Y?'.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {
+              searchTerm: {
+                 type: Type.STRING,
+                 description: "Keywords to match in description (e.g. 'Coffee', 'Uber'). Optional."
+              },
+              category: {
+                type: Type.STRING,
+                enum: Object.values(BudgetCategory),
+                description: "Filter by category. Optional."
+              },
+              month: {
+                type: Type.NUMBER,
+                description: "Filter by month number (0-11) where 0 is January. Optional."
+              }
             }
           }
-        }
-      };
+        };
 
-      const getBudgetSummaryTool: FunctionDeclaration = {
-        name: "getBudgetSummary",
-        description: "Gets the current status of the budget (Total Budget, Spent, Remaining) broken down by category. Use this when user asks 'How is my budget?' or 'Do I have money left for Food?'.",
-        parameters: {
-          type: Type.OBJECT,
-          properties: {} // No params needed, calculates all
-        }
-      };
+        const getBudgetSummaryTool: FunctionDeclaration = {
+          name: "getBudgetSummary",
+          description: "Gets the current status of the budget (Total Budget, Spent, Remaining) broken down by category. Use this when user asks 'How is my budget?' or 'Do I have money left for Food?'.",
+          parameters: {
+            type: Type.OBJECT,
+            properties: {} // No params needed, calculates all
+          }
+        };
 
-      const tools: Tool[] = [{ functionDeclarations: [logExpenseTool, searchExpensesTool, getBudgetSummaryTool] }];
-      
-      let contextInstruction = "";
-      if (appMode === 'yearly' && activePlan) {
-          contextInstruction = `
-          IMPORTANT MODE ALERT: The user is currently in a special 'Yearly Plan Mode' for event "${activePlan.name}".
-          ALL expenses logged MUST be categorized as "${activePlan.category}" automatically, unless the user strictly specifies otherwise.
-          When calling 'logExpense', set the category to "${activePlan.category}" by default.
-          acknowledge that this is for the "${activePlan.name}" plan in your response.
-          `;
+        const tools: Tool[] = [{ functionDeclarations: [logExpenseTool, searchExpensesTool, getBudgetSummaryTool] }];
+        
+        let contextInstruction = "";
+        if (appMode === 'yearly' && activePlan) {
+            contextInstruction = `
+            IMPORTANT MODE ALERT: The user is currently in a special 'Yearly Plan Mode' for event "${activePlan.name}".
+            ALL expenses logged MUST be categorized as "${activePlan.category}" automatically, unless the user strictly specifies otherwise.
+            When calling 'logExpense', set the category to "${activePlan.category}" by default.
+            acknowledge that this is for the "${activePlan.name}" plan in your response.
+            `;
+        }
+
+        chatRef.current = ai.chats.create({
+          model: 'gemini-3-flash-preview',
+          config: {
+            systemInstruction: `You are Papion, an intelligent financial assistant for the Escher Financial Manager app. 
+            Your role is to help users log their expenses and analyze their spending habits.
+            Today's date is ${new Date().toISOString().split('T')[0]}.
+            ${contextInstruction}
+            
+            Guidelines:
+            1. If the user states an expense, extract details and call 'logExpense'.
+            2. If the user asks about past spending (e.g., 'How much on food?'), call 'searchExpenses' or 'getBudgetSummary'.
+            3. If the user asks about budget status, call 'getBudgetSummary'.
+            4. When presenting currency, use Indonesian Rupiah (IDR) formatting (e.g. Rp 50.000).
+            5. Be concise, friendly, and professional.
+            
+            Valid Categories: ${Object.values(BudgetCategory).join(', ')}.`,
+            tools: tools,
+          }
+        });
+      } catch (error: any) {
+        console.error("Chat Init Error", error);
+        // We log it to chat so user can see why it failed
+        setMessages(prev => [...prev, { 
+            id: crypto.randomUUID(), 
+            role: 'system', 
+            text: `System Error: Failed to initialize AI. ${error.message || ''}` 
+        }]);
       }
-
-      chatRef.current = ai.chats.create({
-        model: 'gemini-3-flash-preview',
-        config: {
-          systemInstruction: `You are Papion, an intelligent financial assistant for the Escher Financial Manager app. 
-          Your role is to help users log their expenses and analyze their spending habits.
-          Today's date is ${new Date().toISOString().split('T')[0]}.
-          ${contextInstruction}
-          
-          Guidelines:
-          1. If the user states an expense, extract details and call 'logExpense'.
-          2. If the user asks about past spending (e.g., 'How much on food?'), call 'searchExpenses' or 'getBudgetSummary'.
-          3. If the user asks about budget status, call 'getBudgetSummary'.
-          4. When presenting currency, use Indonesian Rupiah (IDR) formatting (e.g. Rp 50.000).
-          5. Be concise, friendly, and professional.
-          
-          Valid Categories: ${Object.values(BudgetCategory).join(', ')}.`,
-          tools: tools,
-        }
-      });
     };
 
     initChat();
@@ -154,7 +161,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
     // Guard against uninitialized chat
     if (!chatRef.current) {
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please ensure API Key is configured." }]);
+        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please refresh or check configuration." }]);
         return;
     }
 
