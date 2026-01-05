@@ -13,7 +13,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'log' | 'budget'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'budget'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
@@ -188,24 +188,16 @@ export default function App() {
             onModeChange={handleModeChange}
         />
       )}
-      {activeTab === 'log' && (
-        <ExpenseLogger 
-            onSave={(e) => { handleExpenseSave(e); setActiveTab('dashboard'); }} 
-            budgetItems={budgetItems}
-            appMode={appMode}
-            activePlan={activePlan}
-            onModeChange={handleModeChange}
-        />
-      )}
-      {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} />}
-      
-      {/* Floating Chat Assistant */}
-      <ChatAssistant 
+      {activeTab === 'chat' && (
+        <ChatAssistant 
           onSaveExpense={handleExpenseSave} 
           appMode={appMode}
           activePlanName={activePlan}
           budgetItems={budgetItems}
-      />
+          expenses={expenses}
+        />
+      )}
+      {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} />}
     </Layout>
   );
 }

@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Settings as SettingsIcon, Download, RefreshCw, LogOut } from 'lucide-react';
+import { Settings as SettingsIcon, Download, RefreshCw, LogOut, MessageSquare } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'log' | 'budget';
-  setActiveTab: (tab: 'dashboard' | 'log' | 'budget') => void;
+  activeTab: 'dashboard' | 'chat' | 'budget';
+  setActiveTab: (tab: 'dashboard' | 'chat' | 'budget') => void;
   onRefresh?: () => Promise<void>;
   user: User;
   onLogout: () => void;
@@ -120,12 +120,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
               Overview
             </button>
             <button
-              onClick={() => setActiveTab('log')}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'log' ? 'bg-indigo-800 shadow-sm ring-1 ring-indigo-400/30' : 'hover:bg-indigo-500'
+              onClick={() => setActiveTab('chat')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
+                activeTab === 'chat' ? 'bg-indigo-800 shadow-sm ring-1 ring-indigo-400/30' : 'hover:bg-indigo-500'
               }`}
             >
-              Input Expense
+              <MessageSquare className="w-4 h-4" />
+              AI Assistant
             </button>
             <button
               onClick={() => setActiveTab('budget')}
@@ -163,7 +164,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
       <main 
         ref={contentRef}
-        className="flex-grow p-4 md:p-6 w-full max-w-5xl mx-auto transition-transform duration-200 ease-out"
+        className="flex-grow flex flex-col w-full max-w-5xl mx-auto transition-transform duration-200 ease-out h-full"
         style={{ transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : 'none' }}
       >
         {children}

@@ -1,13 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI, Type, FunctionDeclaration, Tool } from "@google/genai";
-import { MessageCircle, Send, X, Bot, User, Sparkles, ChevronDown } from 'lucide-react';
+import { Send, Bot, Sparkles, AlertCircle } from 'lucide-react';
 import { BudgetCategory, Expense, BudgetLineItem } from '../types';
+import { calculateBudgetSummary, formatCurrency } from '../constants';
 
 interface ChatAssistantProps {
   onSaveExpense: (expense: Expense) => void;
   appMode: 'standard' | 'yearly';
   activePlanName: string;
   budgetItems: BudgetLineItem[];
+  expenses: Expense[];
 }
 
 interface Message {
@@ -20,12 +22,12 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     onSaveExpense,
     appMode,
     activePlanName,
-    budgetItems
+    budgetItems,
+    expenses
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
-    { id: 'init', role: 'model', text: "Hi! I'm Papion. Tell me what you spent (e.g., 'Lunch 50k'), and I'll log it for you." }
+    { id: 'init', role: 'model', text: "Hi! I'm Papion, your financial assistant. I can log expenses for you, or answer questions about your spending and budget. Try asking 'How much have I spent on Food?' or 'Log a taxi ride for 50k'." }
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -39,9 +41,9 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isOpen]);
+  }, [messages]);
 
-  // Re-initialize Chat Session when Mode changes to update System Instruction
+  // Re-initialize Chat Session when Mode/Data changes
   useEffect(() => {
     if (!process.env.API_KEY) return;
 
@@ -56,7 +58,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
           properties: {
             amount: { 
               type: Type.NUMBER, 
-              description: "The numeric amount spent. If user says '50k', convert to 50000. If currency is not specified, assume user's local currency." 
+              description: "The numeric amount spent. If user says '50k', convert to 50000. If currency is not specified, assume user's local currency (IDR)." 
             },
             category: {
               type: Type.STRING,
@@ -76,7 +78,39 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         },
       };
 
-      const tools: Tool[] = [{ functionDeclarations: [logExpenseTool] }];
+      const searchExpensesTool: FunctionDeclaration = {
+        name: "searchExpenses",
+        description: "Searches the user's transaction history. Use this when the user asks 'How much did I spend on X?' or 'Did I buy Y?'.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            searchTerm: {
+               type: Type.STRING,
+               description: "Keywords to match in description (e.g. 'Coffee', 'Uber'). Optional."
+            },
+            category: {
+              type: Type.STRING,
+              enum: Object.values(BudgetCategory),
+              description: "Filter by category. Optional."
+            },
+            month: {
+              type: Type.NUMBER,
+              description: "Filter by month number (0-11) where 0 is January. Optional."
+            }
+          }
+        }
+      };
+
+      const getBudgetSummaryTool: FunctionDeclaration = {
+        name: "getBudgetSummary",
+        description: "Gets the current status of the budget (Total Budget, Spent, Remaining) broken down by category. Use this when user asks 'How is my budget?' or 'Do I have money left for Food?'.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {} // No params needed, calculates all
+        }
+      };
+
+      const tools: Tool[] = [{ functionDeclarations: [logExpenseTool, searchExpensesTool, getBudgetSummaryTool] }];
       
       let contextInstruction = "";
       if (appMode === 'yearly' && activePlan) {
@@ -92,16 +126,16 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         model: 'gemini-3-flash-preview',
         config: {
           systemInstruction: `You are Papion, an intelligent financial assistant for the Escher Financial Manager app. 
-          Your role is to help users log their expenses quickly through natural language.
+          Your role is to help users log their expenses and analyze their spending habits.
           Today's date is ${new Date().toISOString().split('T')[0]}.
           ${contextInstruction}
           
           Guidelines:
-          1. If the user states an expense, extract the details and call the 'logExpense' tool immediately.
-          2. If the category is ambiguous, make a best guess based on the description (e.g. 'Latte' -> Food, 'Uber' -> Transportation).
-          3. If the amount is missing, ask for it.
-          4. Be concise, friendly, and professional.
-          5. After logging, confirm briefly.
+          1. If the user states an expense, extract details and call 'logExpense'.
+          2. If the user asks about past spending (e.g., 'How much on food?'), call 'searchExpenses' or 'getBudgetSummary'.
+          3. If the user asks about budget status, call 'getBudgetSummary'.
+          4. When presenting currency, use Indonesian Rupiah (IDR) formatting (e.g. Rp 50.000).
+          5. Be concise, friendly, and professional.
           
           Valid Categories: ${Object.values(BudgetCategory).join(', ')}.`,
           tools: tools,
@@ -134,11 +168,9 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         const functionResponses = [];
         
         for (const call of functionCalls) {
+          // --- LOG EXPENSE ---
           if (call.name === 'logExpense') {
              const args = call.args as any;
-             
-             // Construct Expense Object
-             // Force category link if in Yearly Mode
              const finalCategory = (appMode === 'yearly' && activePlan) ? activePlan.category : (args.category as BudgetCategory);
              const finalPlanName = (appMode === 'yearly' && activePlan) ? activePlan.name : undefined;
 
@@ -151,20 +183,77 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
                budgetItemName: finalPlanName
              };
 
-             // Save to App State
              onSaveExpense(newExpense);
-
-             // Provide feedback
-             setMessages(prev => [...prev, { 
-               id: crypto.randomUUID(), 
-               role: 'system', 
-               text: `✅ Logged: ${args.description} (${finalCategory}) - ${new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(args.amount)} ${finalPlanName ? `[Plan: ${finalPlanName}]` : ''}` 
-             }]);
 
              functionResponses.push({
                functionResponse: {
                  name: call.name,
-                 response: { result: "Expense logged successfully." },
+                 response: { result: `Expense logged: ${args.description} for ${args.amount}` },
+                 id: call.id
+               }
+             });
+          }
+          
+          // --- SEARCH EXPENSES ---
+          else if (call.name === 'searchExpenses') {
+             const args = call.args as any;
+             
+             // Client-side filtering
+             const results = expenses.filter(e => {
+                let match = true;
+                if (args.searchTerm && !e.description.toLowerCase().includes(args.searchTerm.toLowerCase())) match = false;
+                if (args.category && e.category !== args.category) match = false;
+                if (args.month !== undefined && new Date(e.date).getMonth() !== args.month) match = false;
+                return match;
+             });
+
+             const total = results.reduce((sum, e) => sum + e.amount, 0);
+             const resultSummary = {
+                count: results.length,
+                totalAmount: total,
+                transactions: results.slice(0, 10).map(r => `${r.date}: ${r.description} (${r.amount})`) // Limit payload
+             };
+
+             functionResponses.push({
+               functionResponse: {
+                 name: call.name,
+                 response: { result: JSON.stringify(resultSummary) },
+                 id: call.id
+               }
+             });
+          }
+
+          // --- GET BUDGET SUMMARY ---
+          else if (call.name === 'getBudgetSummary') {
+             const summary = calculateBudgetSummary(budgetItems);
+             
+             // Calculate actual spending vs budget for current context
+             const currentMonth = new Date().getMonth();
+             const currentYear = new Date().getFullYear();
+
+             // Filter expenses for this month to check against monthly budget
+             const monthlyExpenses = expenses.filter(e => {
+                 const d = new Date(e.date);
+                 return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+             });
+
+             const data = summary.map(row => {
+                 const spent = monthlyExpenses
+                    .filter(e => e.category === row.category)
+                    .reduce((sum, e) => sum + e.amount, 0);
+                 
+                 return {
+                    category: row.category,
+                    monthlyBudget: row.monthlyAllocation,
+                    spentThisMonth: spent,
+                    remaining: row.monthlyAllocation - spent
+                 };
+             });
+
+             functionResponses.push({
+               functionResponse: {
+                 name: call.name,
+                 response: { result: JSON.stringify(data) },
                  id: call.id
                }
              });
@@ -196,100 +285,76 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   return (
-    <>
-      {/* Floating Action Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 right-6 z-50 p-4 rounded-full shadow-xl transition-all duration-300 transform hover:scale-105 ${
-          isOpen ? 'bg-red-500 rotate-90' : 'bg-indigo-600'
-        } text-white`}
-        aria-label="Toggle Chat Assistant"
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200">
+      
+      {/* Messages Area - WhatsApp Style */}
+      <div 
+        className="flex-grow overflow-y-auto p-4 space-y-3"
+        style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}
       >
-        {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
-      </button>
-
-      {/* Chat Window */}
-      {isOpen && (
-        <div className="fixed bottom-24 right-4 md:right-6 w-[90vw] md:w-96 h-[500px] max-h-[70vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden z-50 border border-gray-100 animate-in slide-in-from-bottom-10 fade-in duration-300">
-          
-          {/* Header */}
-          <div className="bg-indigo-600 p-4 flex items-center gap-3 shadow-md">
-            <div className="bg-white/20 p-2 rounded-full">
-              <Sparkles className="w-5 h-5 text-yellow-300" />
-            </div>
-            <div>
-              <h3 className="font-bold text-white">Papion</h3>
-              <p className="text-indigo-200 text-xs">AI Financial Assistant</p>
-            </div>
-            <button 
-              onClick={() => setIsOpen(false)} 
-              className="ml-auto text-white/80 hover:text-white"
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          >
+            <div
+              className={`max-w-[85%] md:max-w-[70%] px-4 py-2 text-sm shadow-sm relative ${
+                msg.role === 'user'
+                  ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none'
+                  : msg.role === 'system'
+                  ? 'bg-orange-100 text-orange-800 border border-orange-200 rounded-lg text-center w-full mx-auto'
+                  : 'bg-white text-gray-800 rounded-2xl rounded-tl-none border border-gray-100'
+              }`}
             >
-              <ChevronDown className="w-5 h-5" />
-            </button>
-          </div>
-
-          {/* Messages Area */}
-          <div className="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-50">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm shadow-sm ${
-                    msg.role === 'user'
-                      ? 'bg-indigo-600 text-white rounded-tr-none'
-                      : msg.role === 'system'
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200 w-full text-center'
-                      : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
-                  }`}
-                >
-                  {msg.role === 'model' && (
-                     <Bot className="w-4 h-4 mb-1 text-indigo-500 inline-block mr-2" />
-                  )}
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                    <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                    <span className="w-2 h-2 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+              {msg.role === 'model' && (
+                  <div className="flex items-center gap-2 mb-1 border-b border-gray-50 pb-1">
+                      <Bot className="w-3 h-3 text-indigo-500" />
+                      <span className="text-[10px] font-bold text-indigo-500 uppercase">Papion</span>
                   </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input Area */}
-          <div className="p-4 bg-white border-t border-gray-100">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyPress}
-                placeholder={appMode === 'yearly' && activePlan ? `Logging to ${activePlan.name}...` : "Spent 50k on Coffee..."}
-                className="flex-grow bg-gray-100 text-gray-900 rounded-full px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow text-sm"
-                autoFocus
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isTyping}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-3 rounded-full transition-colors shadow-sm"
-              >
-                <Send className="w-5 h-5" />
-              </button>
+              )}
+              {msg.role === 'system' && <AlertCircle className="w-4 h-4 inline mr-2 -mt-1" />}
+              <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
             </div>
           </div>
+        ))}
+        
+        {isTyping && (
+          <div className="flex justify-start w-full animate-in fade-in zoom-in duration-300">
+            <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm flex items-center gap-2">
+               <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
+               <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+               </div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input Area */}
+      <div className="p-3 bg-white border-t border-gray-200">
+        <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-2 border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyPress}
+            placeholder={appMode === 'yearly' && activePlan ? `Ask about ${activePlan.name}...` : "Type a message..."}
+            className="flex-grow bg-transparent text-gray-900 px-4 py-2 focus:outline-none text-sm placeholder-gray-400"
+            autoFocus
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || isTyping}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white p-2.5 rounded-full transition-colors shadow-sm flex-shrink-0"
+          >
+            <Send className="w-4 h-4" />
+          </button>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 };
 
