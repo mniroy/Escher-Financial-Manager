@@ -1,0 +1,7 @@
+{
+  "name": "Escher Financial Manager",
+  "description": "A budget planner and spending tracker using AI to analyze receipts and log expenses against a defined budget.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

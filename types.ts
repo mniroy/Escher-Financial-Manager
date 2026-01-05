@@ -1,0 +1,55 @@
+export enum BudgetCategory {
+  AssetAquire = 'Asset Aquire',
+  Bill = 'Bill',
+  DebtPayment = 'Debt Payment',
+  Education = 'Education',
+  Food = 'Food',
+  Grocery = 'Grocery',
+  HomeMaintenance = 'Home Maintenance',
+  Mortgage = 'Mortgage',
+  Shopping = 'Shopping',
+  Tax = 'Tax',
+  Transportation = 'Transportation',
+  Vacation = 'Vacation',
+  Other = 'Other'
+}
+
+export interface BudgetLineItem {
+  category: BudgetCategory;
+  name: string;
+  amount: number;
+  frequency: 'Monthly' | 'Yearly';
+}
+
+export interface BudgetRow {
+  category: BudgetCategory;
+  monthlyAllocation: number;
+  yearlyAllocation: number;
+}
+
+export interface Expense {
+  id: string;
+  date: string; // ISO Date string
+  category: BudgetCategory;
+  amount: number;
+  description: string;
+  receiptUrl?: string;
+}
+
+export interface ChartDataPoint {
+  name: string;
+  budget: number;
+  spent: number;
+}
+
+export interface AnalysisResult {
+  amount: number;
+  category: string;
+  merchant: string;
+  date: string;
+}
+
+export interface GoogleSheetsConfig {
+  spreadsheetId: string;
+  accessToken: string;
+}
