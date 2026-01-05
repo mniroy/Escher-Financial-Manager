@@ -1,14 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Settings as SettingsIcon, Download, RefreshCw } from 'lucide-react';
+import { Settings as SettingsIcon, Download, RefreshCw, LogOut } from 'lucide-react';
+import { User } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'log' | 'budget' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'log' | 'budget' | 'settings') => void;
+  activeTab: 'dashboard' | 'log' | 'budget';
+  setActiveTab: (tab: 'dashboard' | 'log' | 'budget') => void;
   onRefresh?: () => Promise<void>;
+  user: User;
+  onLogout: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh, user, onLogout }) => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   
   // Pull to refresh state
@@ -38,7 +41,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     }
   };
 
-  // Touch handlers for pull-to-refresh
   const handleTouchStart = (e: React.TouchEvent) => {
     if (window.scrollY === 0 && !isRefreshing && onRefresh) {
       setStartY(e.touches[0].clientY);
@@ -51,8 +53,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       const diff = currentY - startY;
       
       if (diff > 0) {
-        // Add resistance
-        const newDistance = Math.min(diff * 0.4, 120); // Cap at 120px
+        const newDistance = Math.min(diff * 0.4, 120); 
         setPullDistance(newDistance);
       }
     }
@@ -60,11 +61,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
   const handleTouchEnd = async () => {
     if (!onRefresh) return;
-    
     if (pullDistance > 60) {
-      // Trigger refresh
       setIsRefreshing(true);
-      setPullDistance(60); // Snap to loading position
+      setPullDistance(60); 
       try {
         await onRefresh();
       } finally {
@@ -75,7 +74,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
         }, 500);
       }
     } else {
-      // Cancel
       setPullDistance(0);
       setStartY(0);
     }
@@ -90,16 +88,27 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     >
       <header className="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-50">
         <div className="max-w-5xl mx-auto flex flex-col items-center gap-4">
-          <div className="flex items-center cursor-pointer hover:opacity-90 transition-opacity w-full justify-center" onClick={() => setActiveTab('dashboard')} aria-label="Escher Financial Manager Logo">
-            <svg className="max-w-full h-auto" width="240" height="48" viewBox="0 0 240 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g transform="translate(0, 8)">
-                <path d="M16 2L28.1 9V23L16 30L3.9 23V9L16 2Z" stroke="#a5b4fc" strokeWidth="2"/>
-                <path d="M16 2V16M16 16L28.1 9M16 16L3.9 9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </g>
-              <text x="38" y="24" fill="white" fontFamily="sans-serif" fontWeight="800" fontSize="22" letterSpacing="1">ESCHER</text>
-              <text x="38" y="40" fill="#c7d2fe" fontFamily="sans-serif" fontWeight="500" fontSize="12" letterSpacing="1.5">FINANCIAL MANAGER</text>
-            </svg>
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setActiveTab('dashboard')} aria-label="Logo">
+               <svg className="h-8 w-auto" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M16 2L28.1 9V23L16 30L3.9 23V9L16 2Z" stroke="#a5b4fc" strokeWidth="2"/>
+                  <path d="M16 2V16M16 16L28.1 9M16 16L3.9 9" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className="ml-2 font-bold text-xl tracking-tight">ESCHER</span>
+            </div>
+            
+            {/* User Profile */}
+            <div className="flex items-center gap-3">
+              <div className="hidden md:block text-right">
+                <p className="text-xs font-medium text-indigo-100">{user.name}</p>
+              </div>
+              <img src={user.picture} alt="Profile" className="w-8 h-8 rounded-full border-2 border-indigo-400" />
+              <button onClick={onLogout} title="Logout" className="text-indigo-200 hover:text-white">
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
           </div>
+
           <nav className="flex flex-wrap justify-center items-center gap-2 w-full">
             <button
               onClick={() => setActiveTab('dashboard')}
@@ -125,15 +134,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             >
               Plan
             </button>
-             <button
-              onClick={() => setActiveTab('settings')}
-              className={`p-1.5 rounded-md text-sm font-medium transition-colors ${
-                activeTab === 'settings' ? 'bg-indigo-800 shadow-sm ring-1 ring-indigo-400/30' : 'hover:bg-indigo-500'
-              }`}
-              title="Settings"
-            >
-              <SettingsIcon className="w-5 h-5" />
-            </button>
             
             {installPrompt && (
               <button
@@ -148,7 +148,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
         </div>
       </header>
       
-      {/* Refresh Indicator */}
       <div 
         className="fixed top-24 left-0 w-full flex justify-center pointer-events-none z-40 transition-transform duration-200 ease-out"
         style={{ 
@@ -170,7 +169,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       </main>
       
       <footer className="bg-white border-t p-4 text-center text-gray-500 text-xs">
-        Data stored locally unless Google Sheets is configured.
+         Synced with Google Drive • Escher Financial Manager
       </footer>
     </div>
   );

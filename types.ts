@@ -51,5 +51,12 @@ export interface AnalysisResult {
 
 export interface GoogleSheetsConfig {
   spreadsheetId: string;
-  accessToken: string;
+}
+
+export interface User {
+  name: string;
+  email: string;
+  picture: string;
+  accessToken: string; // OAuth access token
+  spreadsheetId?: string;
 }

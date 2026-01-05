@@ -1,15 +1,20 @@
-import { BudgetLineItem, Expense, BudgetCategory, GoogleSheetsConfig } from '../types';
+import { BudgetLineItem, Expense, BudgetCategory, User } from '../types';
 
 const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 
-export const fetchSheetValues = async (config: GoogleSheetsConfig, range: string) => {
-  const response = await fetch(`${BASE_URL}/${config.spreadsheetId}/values/${range}`, {
+export const fetchSheetValues = async (user: User, range: string) => {
+  if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
+
+  const response = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/${range}`, {
     headers: {
-      Authorization: `Bearer ${config.accessToken}`,
+      Authorization: `Bearer ${user.accessToken}`,
     },
   });
   
   if (!response.ok) {
+    if (response.status === 401) {
+       throw new Error("TOKEN_EXPIRED");
+    }
     const errorText = await response.text();
     throw new Error(`Google Sheets API Error: ${response.statusText} - ${errorText}`);
   }
@@ -17,11 +22,13 @@ export const fetchSheetValues = async (config: GoogleSheetsConfig, range: string
   return await response.json();
 };
 
-export const appendSheetRow = async (config: GoogleSheetsConfig, range: string, row: (string | number)[]) => {
-  const response = await fetch(`${BASE_URL}/${config.spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`, {
+export const appendSheetRow = async (user: User, range: string, row: (string | number)[]) => {
+  if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
+
+  const response = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${config.accessToken}`,
+      Authorization: `Bearer ${user.accessToken}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -30,16 +37,17 @@ export const appendSheetRow = async (config: GoogleSheetsConfig, range: string, 
   });
 
   if (!response.ok) {
+     if (response.status === 401) {
+       throw new Error("TOKEN_EXPIRED");
+    }
     throw new Error('Failed to write to Google Sheets');
   }
 };
 
 export const parseBudgetFromSheet = (values: any[][]): BudgetLineItem[] => {
-  if (!values || values.length <= 1) return []; // Empty or just header
+  if (!values || values.length <= 1) return []; 
   
-  // Expected Header: Category, Item Name, Amount, Frequency
   return values.slice(1).map(row => {
-    // Basic cleanup to handle currency symbols if user typed them in sheet
     const amountClean = typeof row[2] === 'string' ? Number(row[2].replace(/[^0-9.-]+/g, "")) : Number(row[2]);
     
     return {
@@ -54,7 +62,6 @@ export const parseBudgetFromSheet = (values: any[][]): BudgetLineItem[] => {
 export const parseExpensesFromSheet = (values: any[][]): Expense[] => {
   if (!values || values.length <= 1) return [];
   
-  // Expected Header: ID, Date, Category, Description, Amount, ReceiptUrl
   return values.slice(1).map(row => {
      const amountClean = typeof row[4] === 'string' ? Number(row[4].replace(/[^0-9.-]+/g, "")) : Number(row[4]);
 
