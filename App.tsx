@@ -5,7 +5,6 @@ import ExpenseLogger from './components/ExpenseLogger';
 import BudgetTable from './components/BudgetTable';
 import ChatAssistant from './components/ChatAssistant';
 import Login from './components/Login';
-import SplashScreen from './components/SplashScreen';
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
@@ -58,11 +57,6 @@ export default function App() {
       setActivePlan(savedMode.planName);
 
       setIsInitializing(false);
-
-      // Hide the HTML splash screen
-      if (typeof window !== 'undefined' && (window as any).hideSplash) {
-        (window as any).hideSplash();
-      }
     };
 
     initApp();
@@ -209,9 +203,13 @@ export default function App() {
     }
   };
 
-  // HTML splash is already showing, just prevent React from rendering until ready
+  // Show a blank screen or spinner while checking local storage to prevent login flicker
   if (isInitializing) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
   }
 
   if (!user) {
