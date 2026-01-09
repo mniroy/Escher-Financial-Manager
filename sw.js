@@ -1,9 +1,9 @@
-const CACHE_NAME = 'escher-cache-v5';
+const CACHE_NAME = 'escher-cache-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  'https://cdn-icons-png.flaticon.com/512/1247/1247833.png'
+  '/icon.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -33,23 +33,23 @@ self.addEventListener('fetch', (event) => {
   // 1. Handle External CDNs (esm.sh, tailwind, fonts, icons)
   // We use a Stale-While-Revalidate strategy here
   if (url.origin !== self.location.origin) {
-     event.respondWith(
-       caches.match(event.request).then((cachedResponse) => {
-         const fetchPromise = fetch(event.request).then((networkResponse) => {
-            if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'cors' && networkResponse.type !== 'basic' && networkResponse.type !== 'opaque')) {
-              return networkResponse;
-            }
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
-            });
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        const fetchPromise = fetch(event.request).then((networkResponse) => {
+          if (!networkResponse || networkResponse.status !== 200 || (networkResponse.type !== 'cors' && networkResponse.type !== 'basic' && networkResponse.type !== 'opaque')) {
             return networkResponse;
-         }).catch(err => console.log('Fetch failed for external asset', err));
+          }
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+          return networkResponse;
+        }).catch(err => console.log('Fetch failed for external asset', err));
 
-         return cachedResponse || fetchPromise;
-       })
-     );
-     return;
+        return cachedResponse || fetchPromise;
+      })
+    );
+    return;
   }
 
   // 2. Handle Local Assets
