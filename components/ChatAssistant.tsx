@@ -18,12 +18,12 @@ interface Message {
   text: string;
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ 
-    onSaveExpense,
-    appMode,
-    activePlanName,
-    budgetItems,
-    expenses
+const ChatAssistant: React.FC<ChatAssistantProps> = ({
+  onSaveExpense,
+  appMode,
+  activePlanName,
+  budgetItems,
+  expenses
 }) => {
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([
@@ -48,38 +48,38 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     const initChat = async () => {
       try {
         if (!process.env.API_KEY) {
-           setMessages(prev => [...prev, { 
-             id: crypto.randomUUID(), 
-             role: 'system', 
-             text: "System Error: API_KEY is missing. \n\nIf you are using Vercel, please rename your environment variable to 'VITE_API_KEY' and redeploy." 
-           }]);
-           return;
+          setMessages(prev => [...prev, {
+            id: crypto.randomUUID(),
+            role: 'system',
+            text: "System Error: API_KEY is missing. \n\nIf you are using Vercel, please rename your environment variable to 'VITE_API_KEY' and redeploy."
+          }]);
+          return;
         }
 
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        
+
         const logExpenseTool: FunctionDeclaration = {
           name: "logExpense",
           description: "Logs a financial expense. Use this when the user mentions spending money.",
           parameters: {
             type: Type.OBJECT,
             properties: {
-              amount: { 
-                type: Type.NUMBER, 
-                description: "The numeric amount spent. If user says '50k', convert to 50000. If currency is not specified, assume user's local currency (IDR)." 
+              amount: {
+                type: Type.NUMBER,
+                description: "The numeric amount spent. If user says '50k', convert to 50000. If currency is not specified, assume user's local currency (IDR)."
               },
               category: {
                 type: Type.STRING,
                 enum: Object.values(BudgetCategory),
                 description: "The budget category."
               },
-              description: { 
-                type: Type.STRING, 
-                description: "Short description of the item or service." 
+              description: {
+                type: Type.STRING,
+                description: "Short description of the item or service."
               },
-              date: { 
-                type: Type.STRING, 
-                description: "ISO 8601 date string (YYYY-MM-DD). Use today's date if not specified." 
+              date: {
+                type: Type.STRING,
+                description: "ISO 8601 date string (YYYY-MM-DD). Use today's date if not specified."
               },
             },
             required: ["amount", "category", "description", "date"],
@@ -93,8 +93,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
             type: Type.OBJECT,
             properties: {
               searchTerm: {
-                 type: Type.STRING,
-                 description: "Keywords to match in description (e.g. 'Coffee', 'Uber'). Optional."
+                type: Type.STRING,
+                description: "Keywords to match in description (e.g. 'Coffee', 'Uber'). Optional."
               },
               category: {
                 type: Type.STRING,
@@ -119,10 +119,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         };
 
         const tools: Tool[] = [{ functionDeclarations: [logExpenseTool, searchExpensesTool, getBudgetSummaryTool] }];
-        
+
         let contextInstruction = "";
         if (appMode === 'yearly' && activePlan) {
-            contextInstruction = `
+          contextInstruction = `
             IMPORTANT MODE ALERT: The user is currently in a special 'Yearly Plan Mode' for event "${activePlan.name}".
             ALL expenses logged MUST be categorized as "${activePlan.category}" automatically, unless the user strictly specifies otherwise.
             When calling 'logExpense', set the category to "${activePlan.category}" by default.
@@ -131,7 +131,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         }
 
         chatRef.current = ai.chats.create({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-2.5-flash',
           config: {
             systemInstruction: `You are Papion, an intelligent financial assistant for the Escher Financial Manager app. 
             Your role is to help users log their expenses and analyze their spending habits.
@@ -151,10 +151,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         });
       } catch (error: any) {
         console.error("Chat Init Error", error);
-        setMessages(prev => [...prev, { 
-            id: crypto.randomUUID(), 
-            role: 'system', 
-            text: `System Error: Failed to initialize AI. ${error.message || ''}` 
+        setMessages(prev => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'system',
+          text: `System Error: Failed to initialize AI. ${error.message || ''}`
         }]);
       }
     };
@@ -166,8 +166,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     if (!input.trim()) return;
 
     if (!chatRef.current) {
-        setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please ensure API Key is configured and refresh the page." }]);
-        return;
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'system', text: "Chat system not initialized. Please ensure API Key is configured and refresh the page." }]);
+      return;
     }
 
     const userText = input;
@@ -178,7 +178,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     try {
       const response = await chatRef.current.sendMessage({ message: userText });
       const text = response.text;
-      
+
       if (text) {
         setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: text }]);
       }
@@ -187,107 +187,107 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
       const functionCalls = response.functionCalls;
       if (functionCalls && functionCalls.length > 0) {
         const functionResponses = [];
-        
+
         for (const call of functionCalls) {
           // --- LOG EXPENSE ---
           if (call.name === 'logExpense') {
-             const args = call.args as any;
-             const finalCategory = (appMode === 'yearly' && activePlan) ? activePlan.category : (args.category as BudgetCategory);
-             const finalPlanName = (appMode === 'yearly' && activePlan) ? activePlan.name : undefined;
+            const args = call.args as any;
+            const finalCategory = (appMode === 'yearly' && activePlan) ? activePlan.category : (args.category as BudgetCategory);
+            const finalPlanName = (appMode === 'yearly' && activePlan) ? activePlan.name : undefined;
 
-             const newExpense: Expense = {
-               id: crypto.randomUUID(),
-               amount: args.amount,
-               category: finalCategory,
-               description: args.description,
-               date: args.date,
-               budgetItemName: finalPlanName
-             };
+            const newExpense: Expense = {
+              id: crypto.randomUUID(),
+              amount: args.amount,
+              category: finalCategory,
+              description: args.description,
+              date: args.date,
+              budgetItemName: finalPlanName
+            };
 
-             onSaveExpense(newExpense);
+            onSaveExpense(newExpense);
 
-             functionResponses.push({
-               functionResponse: {
-                 name: call.name,
-                 response: { result: `Expense logged: ${args.description} for ${args.amount}` },
-                 id: call.id
-               }
-             });
+            functionResponses.push({
+              functionResponse: {
+                name: call.name,
+                response: { result: `Expense logged: ${args.description} for ${args.amount}` },
+                id: call.id
+              }
+            });
           }
-          
+
           // --- SEARCH EXPENSES ---
           else if (call.name === 'searchExpenses') {
-             const args = call.args as any;
-             
-             // Client-side filtering
-             const results = expenses.filter(e => {
-                let match = true;
-                if (args.searchTerm && !e.description.toLowerCase().includes(args.searchTerm.toLowerCase())) match = false;
-                if (args.category && e.category !== args.category) match = false;
-                if (args.month !== undefined && new Date(e.date).getMonth() !== args.month) match = false;
-                return match;
-             });
+            const args = call.args as any;
 
-             const total = results.reduce((sum, e) => sum + e.amount, 0);
-             const resultSummary = {
-                count: results.length,
-                totalAmount: total,
-                transactions: results.slice(0, 10).map(r => `${r.date}: ${r.description} (${r.amount})`) // Limit payload
-             };
+            // Client-side filtering
+            const results = expenses.filter(e => {
+              let match = true;
+              if (args.searchTerm && !e.description.toLowerCase().includes(args.searchTerm.toLowerCase())) match = false;
+              if (args.category && e.category !== args.category) match = false;
+              if (args.month !== undefined && new Date(e.date).getMonth() !== args.month) match = false;
+              return match;
+            });
 
-             functionResponses.push({
-               functionResponse: {
-                 name: call.name,
-                 response: { result: JSON.stringify(resultSummary) },
-                 id: call.id
-               }
-             });
+            const total = results.reduce((sum, e) => sum + e.amount, 0);
+            const resultSummary = {
+              count: results.length,
+              totalAmount: total,
+              transactions: results.slice(0, 10).map(r => `${r.date}: ${r.description} (${r.amount})`) // Limit payload
+            };
+
+            functionResponses.push({
+              functionResponse: {
+                name: call.name,
+                response: { result: JSON.stringify(resultSummary) },
+                id: call.id
+              }
+            });
           }
 
           // --- GET BUDGET SUMMARY ---
           else if (call.name === 'getBudgetSummary') {
-             const summary = calculateBudgetSummary(budgetItems);
-             
-             // Calculate actual spending vs budget for current context
-             const currentMonth = new Date().getMonth();
-             const currentYear = new Date().getFullYear();
+            const summary = calculateBudgetSummary(budgetItems);
 
-             // Filter expenses for this month to check against monthly budget
-             const monthlyExpenses = expenses.filter(e => {
-                 const d = new Date(e.date);
-                 return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-             });
+            // Calculate actual spending vs budget for current context
+            const currentMonth = new Date().getMonth();
+            const currentYear = new Date().getFullYear();
 
-             const data = summary.map(row => {
-                 const spent = monthlyExpenses
-                    .filter(e => e.category === row.category)
-                    .reduce((sum, e) => sum + e.amount, 0);
-                 
-                 return {
-                    category: row.category,
-                    monthlyBudget: row.monthlyAllocation,
-                    spentThisMonth: spent,
-                    remaining: row.monthlyAllocation - spent
-                 };
-             });
+            // Filter expenses for this month to check against monthly budget
+            const monthlyExpenses = expenses.filter(e => {
+              const d = new Date(e.date);
+              return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+            });
 
-             functionResponses.push({
-               functionResponse: {
-                 name: call.name,
-                 response: { result: JSON.stringify(data) },
-                 id: call.id
-               }
-             });
+            const data = summary.map(row => {
+              const spent = monthlyExpenses
+                .filter(e => e.category === row.category)
+                .reduce((sum, e) => sum + e.amount, 0);
+
+              return {
+                category: row.category,
+                monthlyBudget: row.monthlyAllocation,
+                spentThisMonth: spent,
+                remaining: row.monthlyAllocation - spent
+              };
+            });
+
+            functionResponses.push({
+              functionResponse: {
+                name: call.name,
+                response: { result: JSON.stringify(data) },
+                id: call.id
+              }
+            });
           }
         }
 
         // Send function results back to model to complete the turn
         if (functionResponses.length > 0) {
-           // Correctly pass function responses using the 'message' parameter
-           const nextResponse = await chatRef.current.sendMessage({ message: functionResponses });
-           if (nextResponse.text) {
-             setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: nextResponse.text }]);
-           }
+          // Correctly pass function responses using the 'message' parameter
+          const nextResponse = await chatRef.current.sendMessage({ message: functionResponses });
+          if (nextResponse.text) {
+            setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'model', text: nextResponse.text }]);
+          }
         }
       }
 
@@ -308,9 +308,9 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200">
-      
+
       {/* Messages Area - WhatsApp Style */}
-      <div 
+      <div
         className="flex-grow overflow-y-auto p-4 space-y-3"
         style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}
       >
@@ -320,35 +320,34 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
             className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] md:max-w-[70%] px-4 py-2 text-sm shadow-sm relative ${
-                msg.role === 'user'
+              className={`max-w-[85%] md:max-w-[70%] px-4 py-2 text-sm shadow-sm relative ${msg.role === 'user'
                   ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none'
                   : msg.role === 'system'
-                  ? 'bg-orange-100 text-orange-800 border border-orange-200 rounded-lg text-center w-full mx-auto'
-                  : 'bg-white text-gray-800 rounded-2xl rounded-tl-none border border-gray-100'
-              }`}
+                    ? 'bg-orange-100 text-orange-800 border border-orange-200 rounded-lg text-center w-full mx-auto'
+                    : 'bg-white text-gray-800 rounded-2xl rounded-tl-none border border-gray-100'
+                }`}
             >
               {msg.role === 'model' && (
-                  <div className="flex items-center gap-2 mb-1 border-b border-gray-50 pb-1">
-                      <Bot className="w-3 h-3 text-indigo-500" />
-                      <span className="text-[10px] font-bold text-indigo-500 uppercase">Papion</span>
-                  </div>
+                <div className="flex items-center gap-2 mb-1 border-b border-gray-50 pb-1">
+                  <Bot className="w-3 h-3 text-indigo-500" />
+                  <span className="text-[10px] font-bold text-indigo-500 uppercase">Papion</span>
+                </div>
               )}
               {msg.role === 'system' && <AlertCircle className="w-4 h-4 inline mr-2 -mt-1" />}
               <div className="whitespace-pre-wrap leading-relaxed">{msg.text}</div>
             </div>
           </div>
         ))}
-        
+
         {isTyping && (
           <div className="flex justify-start w-full animate-in fade-in zoom-in duration-300">
             <div className="bg-white border border-gray-100 rounded-2xl rounded-tl-none px-4 py-3 shadow-sm flex items-center gap-2">
-               <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
-               <div className="flex gap-1">
+              <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
+              <div className="flex gap-1">
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
-               </div>
+              </div>
             </div>
           </div>
         )}

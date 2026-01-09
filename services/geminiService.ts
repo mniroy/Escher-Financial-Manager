@@ -22,11 +22,11 @@ export const analyzeReceipt = async (base64Image: string, mimeType: string): Pro
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
+
   const categoriesList = Object.values(BudgetCategory).join(', ');
-  
+
   const response = await ai.models.generateContent({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     contents: {
       parts: [
         {
