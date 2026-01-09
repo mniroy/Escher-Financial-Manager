@@ -195,8 +195,13 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
             const finalCategory = (appMode === 'yearly' && activePlan) ? activePlan.category : (args.category as BudgetCategory);
             const finalPlanName = (appMode === 'yearly' && activePlan) ? activePlan.name : undefined;
 
+            // Generate human-readable ID: YYYYMMDD-Category-description
+            const dateSlug = (args.date as string).replace(/-/g, '');
+            const descSlug = (args.description as string).toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
+            const expenseId = `${dateSlug}-${finalCategory.replace(/\s+/g, '')}-${descSlug}`;
+
             const newExpense: Expense = {
-              id: crypto.randomUUID(),
+              id: expenseId,
               amount: args.amount,
               category: finalCategory,
               description: args.description,
@@ -321,10 +326,10 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
           >
             <div
               className={`max-w-[85%] md:max-w-[70%] px-4 py-2 text-sm shadow-sm relative ${msg.role === 'user'
-                  ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none'
-                  : msg.role === 'system'
-                    ? 'bg-orange-100 text-orange-800 border border-orange-200 rounded-lg text-center w-full mx-auto'
-                    : 'bg-white text-gray-800 rounded-2xl rounded-tl-none border border-gray-100'
+                ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none'
+                : msg.role === 'system'
+                  ? 'bg-orange-100 text-orange-800 border border-orange-200 rounded-lg text-center w-full mx-auto'
+                  : 'bg-white text-gray-800 rounded-2xl rounded-tl-none border border-gray-100'
                 }`}
             >
               {msg.role === 'model' && (
