@@ -10,7 +10,7 @@ interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
   onSaveExpense: (expense: Expense) => Promise<void>;
-  onUploadReceipt: (base64Data: string, mimeType: string, fileName: string) => Promise<string>;
+  onUploadReceipt: (base64Data: string, mimeType: string, fileName: string, expenseDate: string) => Promise<string>;
   appMode: 'standard' | 'yearly';
   activePlan: string;
   onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;

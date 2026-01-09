@@ -189,9 +189,9 @@ export default function App() {
           expenses={expenses}
           budgetItems={budgetItems}
           onSaveExpense={handleExpenseSave}
-          onUploadReceipt={async (base64Data, mimeType, fileName) => {
+          onUploadReceipt={async (base64Data, mimeType, fileName, expenseDate) => {
             if (!user) throw new Error('User not logged in');
-            return await uploadReceiptToDrive(user, base64Data, mimeType, fileName);
+            return await uploadReceiptToDrive(user, base64Data, mimeType, fileName, expenseDate);
           }}
           appMode={appMode}
           activePlan={activePlan}

@@ -6,7 +6,7 @@ import { formatCurrency } from '../constants';
 
 interface ExpenseLoggerProps {
     onSave: (expense: Expense) => Promise<void>;
-    onUploadReceipt: (base64Data: string, mimeType: string, fileName: string) => Promise<string>;
+    onUploadReceipt: (base64Data: string, mimeType: string, fileName: string, expenseDate: string) => Promise<string>;
     budgetItems?: BudgetLineItem[];
     appMode: 'standard' | 'yearly';
     activePlan: string;
@@ -76,11 +76,11 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                 const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
                 const expenseId = `${dateSlug}-${finalCategory.replace(/\s+/g, '')}-${descSlug}`;
 
-                // Upload receipt image to Google Drive
+                // Upload receipt image to Google Drive (organized by year/month)
                 const receiptFileName = `receipt-${expenseId}.${mimeType.split('/')[1] || 'jpg'}`;
                 let receiptUrl = '';
                 try {
-                    receiptUrl = await onUploadReceipt(base64Data, mimeType, receiptFileName);
+                    receiptUrl = await onUploadReceipt(base64Data, mimeType, receiptFileName, expenseDate);
                 } catch (uploadError) {
                     console.warn('Failed to upload receipt to Drive, continuing without it', uploadError);
                     receiptUrl = 'upload-failed';
