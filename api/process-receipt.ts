@@ -68,9 +68,8 @@ async function uploadToDrive(token: string, base64: string, mime: string, fileNa
     const year = await ensureFolder(token, date.getFullYear().toString(), root);
     const month = await ensureFolder(token, MONTH_NAMES[date.getMonth()], year);
 
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    // Node.js compatible way to convert base64 to bytes
+    const bytes = Buffer.from(base64, 'base64');
 
     const form = new FormData();
     form.append('metadata', new Blob([JSON.stringify({ name: fileName, mimeType: mime, parents: [month] })], { type: 'application/json' }));
@@ -100,9 +99,21 @@ async function appendToSheet(token: string, sheetId: string, expense: ProcessedE
     if (!res.ok) throw new Error(`Sheets error: ${await res.text()}`);
 }
 
+// Helper to read raw body if Vercel doesn't parse it
+async function getRawBody(req: VercelRequest): Promise<string> {
+    if (req.body && typeof req.body !== 'string') return JSON.stringify(req.body);
+    if (typeof req.body === 'string') return req.body;
+
+    return new Promise((resolve) => {
+        let body = '';
+        req.on('data', (chunk) => { body += chunk; });
+        req.on('end', () => { resolve(body); });
+    });
+}
+
 // ============= MAIN HANDLER =============
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // Debug logging for n8n/Vercel issues
+    // Debug logging
     console.log('--- Request Debug ---');
     console.log('Method:', req.method);
     console.log('Headers:', JSON.stringify(req.headers));
@@ -131,23 +142,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!geminiKey) return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
 
     try {
-        // Handle potential body parsing issues (especially for n8n)
-        let body = req.body;
-        if (typeof body === 'string') {
-            try {
-                body = JSON.parse(body);
-            } catch (e) {
-                console.error('Failed to parse body string:', e);
-            }
+        // Read body manually to be bulletproof
+        const rawBody = await getRawBody(req);
+        console.log('Raw Body Length:', rawBody?.length || 0);
+
+        if (!rawBody || rawBody === '{}' || rawBody === '') {
+            return res.status(400).json({ success: false, error: 'Request body is empty' });
         }
 
-        if (!body) {
-            return res.status(400).json({ success: false, error: 'Request body is empty or not JSON' });
+        let body;
+        try {
+            body = JSON.parse(rawBody);
+        } catch (e) {
+            return res.status(400).json({ success: false, error: 'Request body is not valid JSON' });
         }
 
         const { base64Image, mimeType, spreadsheetId } = body;
         if (!base64Image || !mimeType || !spreadsheetId) {
-            return res.status(400).json({ success: false, error: `Missing fields: ${!base64Image ? 'base64Image ' : ''}${!mimeType ? 'mimeType ' : ''}${!spreadsheetId ? 'spreadsheetId' : ''}` });
+            const missing = [];
+            if (!base64Image) missing.push('base64Image');
+            if (!mimeType) missing.push('mimeType');
+            if (!spreadsheetId) missing.push('spreadsheetId');
+            return res.status(400).json({ success: false, error: `Missing fields: ${missing.join(', ')}` });
         }
 
         const analysis = await analyzeReceipt(base64Image, mimeType, geminiKey);
