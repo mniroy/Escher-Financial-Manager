@@ -36,17 +36,27 @@ export const analyzeReceipt = async (base64Image: string, mimeType: string): Pro
           }
         },
         {
-          text: `Analyze this receipt image. Extract the final total amount paid (net/grand total), the merchant/vendor name, the date, and categorize the expense.
+          text: `Analyze this receipt/order confirmation image. Extract the final total amount paid, merchant name, date, and category.
 
-IMPORTANT: You MUST categorize into EXACTLY one of these categories (use exact spelling): [${categoriesList}]. 
-- Food = restaurants, cafes, eating out
-- Grocery = supermarkets, grocery stores
-- Shopping = retail, online shopping, general purchases  
-- Transportation = taxi, gas, tolls, parking
+CRITICAL - AMOUNT EXTRACTION:
+- This is Indonesian Rupiah (IDR) currency
+- In Indonesian format, DOTS (.) are THOUSAND separators, NOT decimals
+- Examples: "Rp134.100" = 134100, "Rp1.500.000" = 1500000, "Rp50.000" = 50000
+- Look for "Total Pesanan", "Grand Total", "Total Pembayaran", or similar
+- Return the amount as a plain NUMBER without dots or currency symbols
+- The amount should typically be in thousands or hundreds of thousands
+
+CATEGORY - Use EXACTLY one of: [${categoriesList}]
+- Food = restaurants, cafes, food delivery
+- Grocery = supermarkets, grocery stores  
+- Shopping = retail, e-commerce (Shopee, Tokopedia, etc.), general purchases
+- Transportation = taxi, Grab, Gojek rides, gas, tolls
 - Bill = utilities, subscriptions, services
 - If unsure, use "Other"
 
-Return the date in YYYY-MM-DD format.`
+DATE: Return in YYYY-MM-DD format. Look for order date or transaction date.
+
+MERCHANT: Extract the store/seller name.`
         }
       ]
     },
@@ -55,7 +65,10 @@ Return the date in YYYY-MM-DD format.`
       responseSchema: {
         type: Type.OBJECT,
         properties: {
-          amount: { type: Type.NUMBER, description: "Total amount of the receipt" },
+          amount: {
+            type: Type.NUMBER,
+            description: "Total amount as a number WITHOUT thousand separators. Example: Rp134.100 should be 134100"
+          },
           merchant: { type: Type.STRING, description: "Name of the store or vendor" },
           date: { type: Type.STRING, description: "Date of purchase in YYYY-MM-DD format" },
           category: {

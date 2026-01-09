@@ -9,6 +9,14 @@ const MONTH_NAMES = [
     'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
+// In-memory cache for folder IDs to prevent race conditions
+// Key format: "parentId:folderName" or ":folderName" for root
+const folderCache: Map<string, string> = new Map();
+
+// In-memory lock for folder creation to prevent duplicate creation attempts
+// Key format: "parentId:folderName"
+const folderLocks: Map<string, Promise<string>> = new Map();
+
 // Find a folder by name within a parent folder (or root if no parent)
 const findFolder = async (
     accessToken: string,
@@ -61,24 +69,64 @@ const createFolder = async (
     });
 
     if (!response.ok) {
-        throw new Error('Failed to create folder');
+        // If folder creation fails, it might be because another request just created it
+        // Try to find it again
+        const existingId = await findFolder(accessToken, folderName, parentId);
+        if (existingId) {
+            return existingId;
+        }
+        throw new Error(`Failed to create folder: ${folderName}`);
     }
 
     const data = await response.json();
     return data.id;
 };
 
-// Find or create a folder
+// Find or create a folder with locking to prevent race conditions
 const ensureFolder = async (
     accessToken: string,
     folderName: string,
     parentId?: string
 ): Promise<string> => {
-    const existingId = await findFolder(accessToken, folderName, parentId);
-    if (existingId) {
-        return existingId;
+    const cacheKey = `${parentId || ''}:${folderName}`;
+
+    // Check cache first
+    const cachedId = folderCache.get(cacheKey);
+    if (cachedId) {
+        return cachedId;
     }
-    return await createFolder(accessToken, folderName, parentId);
+
+    // Check if another request is already creating this folder
+    const existingLock = folderLocks.get(cacheKey);
+    if (existingLock) {
+        // Wait for the other request to finish
+        return await existingLock;
+    }
+
+    // Create a promise that will be used as a lock
+    const lockPromise = (async () => {
+        try {
+            // First, try to find existing folder
+            let folderId = await findFolder(accessToken, folderName, parentId);
+
+            if (!folderId) {
+                // Create the folder
+                folderId = await createFolder(accessToken, folderName, parentId);
+            }
+
+            // Cache the result
+            folderCache.set(cacheKey, folderId);
+            return folderId;
+        } finally {
+            // Release the lock
+            folderLocks.delete(cacheKey);
+        }
+    })();
+
+    // Set the lock
+    folderLocks.set(cacheKey, lockPromise);
+
+    return await lockPromise;
 };
 
 // Get the folder ID for the receipt destination (creates folder structure if needed)
