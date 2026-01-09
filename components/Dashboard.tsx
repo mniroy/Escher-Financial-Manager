@@ -9,7 +9,8 @@ import ExpenseLogger from './ExpenseLogger';
 interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
-  onSaveExpense: (expense: Expense) => void;
+  onSaveExpense: (expense: Expense) => Promise<void>;
+  onUploadReceipt: (base64Data: string, mimeType: string, fileName: string) => Promise<string>;
   appMode: 'standard' | 'yearly';
   activePlan: string;
   onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;
@@ -19,6 +20,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   expenses,
   budgetItems,
   onSaveExpense,
+  onUploadReceipt,
   appMode,
   activePlan,
   onModeChange
@@ -132,8 +134,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <button
               onClick={() => onModeChange('standard', '')}
               className={`flex-1 p-4 rounded-xl border-2 text-left transition-all ${appMode === 'standard'
-                  ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
-                  : 'border-gray-100 hover:border-gray-200 bg-white'
+                ? 'border-indigo-600 bg-indigo-50 ring-1 ring-indigo-200'
+                : 'border-gray-100 hover:border-gray-200 bg-white'
                 }`}
             >
               <div className="flex items-center gap-3">
@@ -156,8 +158,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Yearly Mode Button/Select */}
             <div className={`flex-1 rounded-xl border-2 transition-all flex flex-col ${appMode === 'yearly'
-                ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-200'
-                : 'border-gray-100 hover:border-gray-200 bg-white'
+              ? 'border-purple-600 bg-purple-50 ring-1 ring-purple-200'
+              : 'border-gray-100 hover:border-gray-200 bg-white'
               }`}>
               <div
                 className="flex-1 p-4 cursor-pointer"
@@ -246,6 +248,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           <div className="p-2">
             <ExpenseLogger
               onSave={onSaveExpense}
+              onUploadReceipt={onUploadReceipt}
               budgetItems={budgetItems}
               appMode={appMode}
               activePlan={activePlan}
@@ -257,8 +260,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         <button
           onClick={() => setShowLogger(true)}
           className={`w-full p-5 rounded-xl shadow-md flex items-center justify-center gap-3 text-xl font-bold transition-all transform hover:scale-[1.01] ${appMode === 'yearly'
-              ? 'bg-purple-600 hover:bg-purple-700 text-white'
-              : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+            ? 'bg-purple-600 hover:bg-purple-700 text-white'
+            : 'bg-emerald-500 hover:bg-emerald-600 text-white'
             }`}
         >
           <Camera className="w-8 h-8" />
@@ -289,8 +292,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           <button
             onClick={() => setViewMode('monthly')}
             className={`flex-1 md:flex-none justify-center px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'monthly'
-                ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <Calendar className="w-4 h-4" />
@@ -299,8 +302,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           <button
             onClick={() => setViewMode('yearly')}
             className={`flex-1 md:flex-none justify-center px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'yearly'
-                ? 'bg-white text-indigo-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-white text-indigo-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <TrendingUp className="w-4 h-4" />

@@ -5,7 +5,8 @@ import { BudgetCategory, Expense, BudgetLineItem } from '../types';
 import { formatCurrency } from '../constants';
 
 interface ExpenseLoggerProps {
-    onSave: (expense: Expense) => void;
+    onSave: (expense: Expense) => Promise<void>;
+    onUploadReceipt: (base64Data: string, mimeType: string, fileName: string) => Promise<string>;
     budgetItems?: BudgetLineItem[];
     appMode: 'standard' | 'yearly';
     activePlan: string;
@@ -21,6 +22,7 @@ interface LogTask {
 
 const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
     onSave,
+    onUploadReceipt,
     budgetItems = [],
     appMode,
     activePlan,
@@ -74,17 +76,27 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                 const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
                 const expenseId = `${dateSlug}-${finalCategory.replace(/\s+/g, '')}-${descSlug}`;
 
+                // Upload receipt image to Google Drive
+                const receiptFileName = `receipt-${expenseId}.${mimeType.split('/')[1] || 'jpg'}`;
+                let receiptUrl = '';
+                try {
+                    receiptUrl = await onUploadReceipt(base64Data, mimeType, receiptFileName);
+                } catch (uploadError) {
+                    console.warn('Failed to upload receipt to Drive, continuing without it', uploadError);
+                    receiptUrl = 'upload-failed';
+                }
+
                 const newExpense: Expense = {
                     id: expenseId,
                     amount: result.amount,
                     category: finalCategory,
                     date: expenseDate,
                     description: description,
-                    receiptUrl: `data:${mimeType};base64,${base64Data}`,
+                    receiptUrl: receiptUrl,
                     budgetItemName: finalPlanName
                 };
 
-                // Save
+                // Save to Google Sheets
                 await onSave(newExpense);
 
                 // Update Task Status to Success
@@ -171,8 +183,8 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                     <div
                         onClick={() => cameraInputRef.current?.click()}
                         className={`group cursor-pointer flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed rounded-2xl transition-all ${appMode === 'yearly' && !activeYearlyPlan
-                                ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                                : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 active:scale-95'
+                            ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                            : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 active:scale-95'
                             }`}
                         style={{ pointerEvents: (appMode === 'yearly' && !activeYearlyPlan) ? 'none' : 'auto' }}
                     >
@@ -186,8 +198,8 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                     <div
                         onClick={() => uploadInputRef.current?.click()}
                         className={`group cursor-pointer flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed rounded-2xl transition-all ${appMode === 'yearly' && !activeYearlyPlan
-                                ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                                : 'border-indigo-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 active:scale-95'
+                            ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
+                            : 'border-indigo-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 active:scale-95'
                             }`}
                         style={{ pointerEvents: (appMode === 'yearly' && !activeYearlyPlan) ? 'none' : 'auto' }}
                     >

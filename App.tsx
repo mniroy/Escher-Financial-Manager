@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import ExpenseLogger from './components/ExpenseLogger';
@@ -7,6 +7,7 @@ import ChatAssistant from './components/ChatAssistant';
 import Login from './components/Login';
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
+import { uploadReceiptToDrive } from './services/driveService';
 import { Expense, BudgetLineItem, User } from './types';
 import { DEFAULT_BUDGET_ITEMS } from './constants';
 import { Loader2 } from 'lucide-react';
@@ -31,7 +32,7 @@ export default function App() {
       if (storedUser) {
         setUser(storedUser);
       }
-      
+
       // Load persisted mode
       const savedMode = getAppMode();
       setAppMode(savedMode.mode);
@@ -92,60 +93,60 @@ export default function App() {
   const handleExpenseSave = async (expense: Expense) => {
     // Note: We deliberately do not set global 'loading' state here to allow
     // the ExpenseLogger to perform this in the "background" without blocking the UI.
-    
+
     if (user) {
-       try {
-         const row = [
-           expense.id,
-           expense.date,
-           expense.category,
-           expense.description,
-           expense.amount,
-           expense.receiptUrl || '',
-           expense.budgetItemName || '' // Save the linked plan name
-         ];
-         await appendSheetRow(user, 'Expenses!A:G', row);
-         // Reload data silently to update the UI with the new row
-         const expensesData = await fetchSheetValues(user, 'Expenses!A:G');
-         const parsedExpenses = parseExpensesFromSheet(expensesData.values);
-         setExpenses(parsedExpenses);
-         
-       } catch (error: any) {
-         console.error("Save Error", error);
-         if (error.message === 'TOKEN_EXPIRED') {
-            alert("Session expired. Please log in again.");
-            handleLogout();
-         } else {
-            console.error("Failed to save to Google Sheet.");
-         }
-       }
+      try {
+        const row = [
+          expense.id,
+          expense.date,
+          expense.category,
+          expense.description,
+          expense.amount,
+          expense.receiptUrl || '',
+          expense.budgetItemName || '' // Save the linked plan name
+        ];
+        await appendSheetRow(user, 'Expenses!A:G', row);
+        // Reload data silently to update the UI with the new row
+        const expensesData = await fetchSheetValues(user, 'Expenses!A:G');
+        const parsedExpenses = parseExpensesFromSheet(expensesData.values);
+        setExpenses(parsedExpenses);
+
+      } catch (error: any) {
+        console.error("Save Error", error);
+        if (error.message === 'TOKEN_EXPIRED') {
+          alert("Session expired. Please log in again.");
+          handleLogout();
+        } else {
+          console.error("Failed to save to Google Sheet.");
+        }
+      }
     } else {
-       // Fallback logic
-       saveLocalExpense(expense);
-       setExpenses(getExpenses());
+      // Fallback logic
+      saveLocalExpense(expense);
+      setExpenses(getExpenses());
     }
   };
 
   const handleBudgetUpdate = async (newBudgetItems: BudgetLineItem[]) => {
-      if (!user) return;
-      setLoading(true);
-      try {
-          // Optimistic update
-          setBudgetItems(newBudgetItems);
-          await saveBudgetToSheet(user, newBudgetItems);
-      } catch (error: any) {
-          console.error("Budget Save Error", error);
-          if (error.message === 'TOKEN_EXPIRED') {
-            alert("Session expired. Please log in again.");
-            handleLogout();
-         } else {
-            alert("Failed to update budget in Google Sheets.");
-            // Revert changes by reloading
-            loadData(user);
-         }
-      } finally {
-          setLoading(false);
+    if (!user) return;
+    setLoading(true);
+    try {
+      // Optimistic update
+      setBudgetItems(newBudgetItems);
+      await saveBudgetToSheet(user, newBudgetItems);
+    } catch (error: any) {
+      console.error("Budget Save Error", error);
+      if (error.message === 'TOKEN_EXPIRED') {
+        alert("Session expired. Please log in again.");
+        handleLogout();
+      } else {
+        alert("Failed to update budget in Google Sheets.");
+        // Revert changes by reloading
+        loadData(user);
       }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Show a blank screen or spinner while checking local storage to prevent login flicker
@@ -166,36 +167,40 @@ export default function App() {
 
   if (loading && expenses.length === 0 && budgetItems.length === 0) {
     return (
-       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-             <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mx-auto mb-4" />
-             <p className="text-gray-600 font-medium">Syncing with your Financial Database...</p>
-          </div>
-       </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mx-auto mb-4" />
+          <p className="text-gray-600 font-medium">Syncing with your Financial Database...</p>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab} 
+    <Layout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
       onRefresh={() => loadData(user)}
       user={user}
       onLogout={handleLogout}
     >
       {activeTab === 'dashboard' && (
-        <Dashboard 
-            expenses={expenses} 
-            budgetItems={budgetItems} 
-            onSaveExpense={handleExpenseSave}
-            appMode={appMode}
-            activePlan={activePlan}
-            onModeChange={handleModeChange}
+        <Dashboard
+          expenses={expenses}
+          budgetItems={budgetItems}
+          onSaveExpense={handleExpenseSave}
+          onUploadReceipt={async (base64Data, mimeType, fileName) => {
+            if (!user) throw new Error('User not logged in');
+            return await uploadReceiptToDrive(user, base64Data, mimeType, fileName);
+          }}
+          appMode={appMode}
+          activePlan={activePlan}
+          onModeChange={handleModeChange}
         />
       )}
       {activeTab === 'chat' && (
-        <ChatAssistant 
-          onSaveExpense={handleExpenseSave} 
+        <ChatAssistant
+          onSaveExpense={handleExpenseSave}
           appMode={appMode}
           activePlanName={activePlan}
           budgetItems={budgetItems}

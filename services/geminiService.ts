@@ -36,7 +36,17 @@ export const analyzeReceipt = async (base64Image: string, mimeType: string): Pro
           }
         },
         {
-          text: `Analyze this receipt image. Extract the final total amount paid (net/grand total), the merchant/vendor name, the date, and categorize the expense into exactly one of these categories: [${categoriesList}]. If you are unsure, use "Other". Return the date in YYYY-MM-DD format.`
+          text: `Analyze this receipt image. Extract the final total amount paid (net/grand total), the merchant/vendor name, the date, and categorize the expense.
+
+IMPORTANT: You MUST categorize into EXACTLY one of these categories (use exact spelling): [${categoriesList}]. 
+- Food = restaurants, cafes, eating out
+- Grocery = supermarkets, grocery stores
+- Shopping = retail, online shopping, general purchases  
+- Transportation = taxi, gas, tolls, parking
+- Bill = utilities, subscriptions, services
+- If unsure, use "Other"
+
+Return the date in YYYY-MM-DD format.`
         }
       ]
     },
@@ -48,7 +58,11 @@ export const analyzeReceipt = async (base64Image: string, mimeType: string): Pro
           amount: { type: Type.NUMBER, description: "Total amount of the receipt" },
           merchant: { type: Type.STRING, description: "Name of the store or vendor" },
           date: { type: Type.STRING, description: "Date of purchase in YYYY-MM-DD format" },
-          category: { type: Type.STRING, description: "One of the provided budget categories" }
+          category: {
+            type: Type.STRING,
+            enum: Object.values(BudgetCategory),
+            description: "Must be one of the exact budget categories"
+          }
         },
         required: ["amount", "merchant", "category"]
       }
