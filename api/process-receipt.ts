@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // API URLs
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
 const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
@@ -12,15 +12,24 @@ const BUDGET_CATEGORIES = ['Asset Aquire', 'Bill', 'Debt Payment', 'Education', 
 interface AnalysisResult { amount: number; merchant: string; date: string; category: string; }
 interface ProcessedExpense { id: string; date: string; category: string; description: string; amount: number; receiptUrl: string; }
 
+// Helper to clean base64 data (removes prefixes and leading/trailing garbage)
+function cleanBase64(base64: string): string {
+    return base64
+        .replace(/^data:image\/[a-z]+;base64,/, '') // Remove data URI prefix
+        .replace(/^=/, '')                          // Remove accidental leading '='
+        .trim();                                     // Remove any whitespace
+}
+
 // ============= GEMINI AI ANALYSIS =============
 async function analyzeReceipt(base64Image: string, mimeType: string, apiKey: string): Promise<AnalysisResult> {
+    const cleanData = cleanBase64(base64Image);
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             contents: [{
                 parts: [
-                    { inlineData: { mimeType, data: base64Image } },
+                    { inlineData: { mimeType, data: cleanData } },
                     {
                         text: `Analyze this receipt. Extract total amount, merchant, date, category.
 CRITICAL: Indonesian Rupiah - dots are THOUSAND separators (Rp134.100 = 134100).
