@@ -102,6 +102,11 @@ async function appendToSheet(token: string, sheetId: string, expense: ProcessedE
 
 // ============= MAIN HANDLER =============
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    // Debug logging for n8n/Vercel issues
+    console.log('--- Request Debug ---');
+    console.log('Method:', req.method);
+    console.log('Headers:', JSON.stringify(req.headers));
+
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY, Authorization');
@@ -109,13 +114,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
-    // API Key authentication (your custom key)
+    // API Key authentication
     const apiKey = req.headers['x-api-key'];
     if (!process.env.RECEIPT_API_KEY || apiKey !== process.env.RECEIPT_API_KEY) {
         return res.status(401).json({ success: false, error: 'Invalid API key' });
     }
 
-    // Get Google OAuth token from Authorization header (Bearer token)
+    // Get Google OAuth token
     const authHeader = req.headers['authorization'] as string;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ success: false, error: 'Missing Authorization header (Bearer token)' });
@@ -126,9 +131,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!geminiKey) return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
 
     try {
-        const { base64Image, mimeType, spreadsheetId } = req.body;
+        // Handle potential body parsing issues (especially for n8n)
+        let body = req.body;
+        if (typeof body === 'string') {
+            try {
+                body = JSON.parse(body);
+            } catch (e) {
+                console.error('Failed to parse body string:', e);
+            }
+        }
+
+        if (!body) {
+            return res.status(400).json({ success: false, error: 'Request body is empty or not JSON' });
+        }
+
+        const { base64Image, mimeType, spreadsheetId } = body;
         if (!base64Image || !mimeType || !spreadsheetId) {
-            return res.status(400).json({ success: false, error: 'Missing: base64Image, mimeType, or spreadsheetId' });
+            return res.status(400).json({ success: false, error: `Missing fields: ${!base64Image ? 'base64Image ' : ''}${!mimeType ? 'mimeType ' : ''}${!spreadsheetId ? 'spreadsheetId' : ''}` });
         }
 
         const analysis = await analyzeReceipt(base64Image, mimeType, geminiKey);
@@ -147,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         return res.status(200).json({ success: true, expense });
     } catch (error: any) {
-        console.error('Error:', error);
+        console.error('Full Error:', error);
         return res.status(500).json({ success: false, error: error.message || 'Internal error' });
     }
 }
