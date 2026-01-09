@@ -1,341 +1,145 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// Google Genai imports
+// API URLs
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-
-// Google Drive API
 const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3';
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-
-// Google Sheets API
 const SHEETS_API_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 
-// Month names for folder naming
-const MONTH_NAMES = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const BUDGET_CATEGORIES = ['Asset Aquire', 'Bill', 'Debt Payment', 'Education', 'Food', 'Grocery', 'Home Maintenance', 'Mortgage', 'Shopping', 'Tax', 'Transportation', 'Vacation', 'Other'];
 
-// Budget categories (must match frontend)
-const BUDGET_CATEGORIES = [
-    'Asset Aquire', 'Bill', 'Debt Payment', 'Education', 'Food',
-    'Grocery', 'Home Maintenance', 'Mortgage', 'Shopping',
-    'Tax', 'Transportation', 'Vacation', 'Other'
-];
-
-interface AnalysisResult {
-    amount: number;
-    merchant: string;
-    date: string;
-    category: string;
-}
-
-interface ProcessedExpense {
-    id: string;
-    date: string;
-    category: string;
-    description: string;
-    amount: number;
-    receiptUrl: string;
-}
+interface AnalysisResult { amount: number; merchant: string; date: string; category: string; }
+interface ProcessedExpense { id: string; date: string; category: string; description: string; amount: number; receiptUrl: string; }
 
 // ============= GEMINI AI ANALYSIS =============
-
 async function analyzeReceipt(base64Image: string, mimeType: string, apiKey: string): Promise<AnalysisResult> {
-    const categoriesList = BUDGET_CATEGORIES.join(', ');
-
-    const requestBody = {
-        contents: [{
-            parts: [
-                {
-                    inlineData: {
-                        mimeType: mimeType,
-                        data: base64Image
-                    }
-                },
-                {
-                    text: `Analyze this receipt/order confirmation image. Extract the final total amount paid, merchant name, date, and category.
-
-CRITICAL - AMOUNT EXTRACTION:
-- This is Indonesian Rupiah (IDR) currency
-- In Indonesian format, DOTS (.) are THOUSAND separators, NOT decimals
-- Examples: "Rp134.100" = 134100, "Rp1.500.000" = 1500000, "Rp50.000" = 50000
-- Look for "Total Pesanan", "Grand Total", "Total Pembayaran", or similar
-- Return the amount as a plain NUMBER without dots or currency symbols
-- The amount should typically be in thousands or hundreds of thousands
-
-CATEGORY - Use EXACTLY one of: [${categoriesList}]
-- Food = restaurants, cafes, food delivery
-- Grocery = supermarkets, grocery stores  
-- Shopping = retail, e-commerce (Shopee, Tokopedia, etc.), general purchases
-- Transportation = taxi, Grab, Gojek rides, gas, tolls
-- Bill = utilities, subscriptions, services
-- If unsure, use "Other"
-
-DATE: Return in YYYY-MM-DD format. Look for order date or transaction date.
-
-MERCHANT: Extract the store/seller name.
-
-Return JSON: {"amount": number, "merchant": string, "date": string, "category": string}`
-                }
-            ]
-        }],
-        generationConfig: {
-            responseMimeType: "application/json"
-        }
-    };
-
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify({
+            contents: [{
+                parts: [
+                    { inlineData: { mimeType, data: base64Image } },
+                    {
+                        text: `Analyze this receipt. Extract total amount, merchant, date, category.
+CRITICAL: Indonesian Rupiah - dots are THOUSAND separators (Rp134.100 = 134100).
+Categories: ${BUDGET_CATEGORIES.join(', ')}. Return JSON: {"amount": number, "merchant": string, "date": "YYYY-MM-DD", "category": string}`
+                    }
+                ]
+            }],
+            generationConfig: { responseMimeType: "application/json" }
+        })
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API error: ${errorText}`);
-    }
-
+    if (!response.ok) throw new Error(`Gemini error: ${await response.text()}`);
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-    if (!text) {
-        throw new Error('No response from Gemini AI');
-    }
-
-    return JSON.parse(text) as AnalysisResult;
+    return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
 }
 
-// ============= GOOGLE DRIVE UPLOAD =============
-
-async function findFolder(accessToken: string, folderName: string, parentId?: string): Promise<string | null> {
-    let query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-    if (parentId) {
-        query += ` and '${parentId}' in parents`;
-    }
-
-    const response = await fetch(
-        `${DRIVE_API_URL}/files?q=${encodeURIComponent(query)}&fields=files(id,name)`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
+// ============= GOOGLE DRIVE =============
+async function findFolder(token: string, name: string, parentId?: string): Promise<string | null> {
+    let q = `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    if (parentId) q += ` and '${parentId}' in parents`;
+    const res = await fetch(`${DRIVE_API_URL}/files?q=${encodeURIComponent(q)}&fields=files(id)`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await res.json();
     return data.files?.[0]?.id || null;
 }
 
-async function createFolder(accessToken: string, folderName: string, parentId?: string): Promise<string> {
-    const metadata: any = {
-        name: folderName,
-        mimeType: 'application/vnd.google-apps.folder',
-    };
-    if (parentId) metadata.parents = [parentId];
-
-    const response = await fetch(`${DRIVE_API_URL}/files`, {
+async function createFolder(token: string, name: string, parentId?: string): Promise<string> {
+    const res = await fetch(`${DRIVE_API_URL}/files`, {
         method: 'POST',
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(metadata),
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', ...(parentId && { parents: [parentId] }) })
     });
-
-    if (!response.ok) {
-        // Race condition: folder might have been created by another request
-        const existingId = await findFolder(accessToken, folderName, parentId);
-        if (existingId) return existingId;
-        throw new Error(`Failed to create folder: ${folderName}`);
+    if (!res.ok) {
+        const existing = await findFolder(token, name, parentId);
+        if (existing) return existing;
+        throw new Error('Failed to create folder');
     }
-
-    const data = await response.json();
-    return data.id;
+    return (await res.json()).id;
 }
 
-async function ensureFolder(accessToken: string, folderName: string, parentId?: string): Promise<string> {
-    const existingId = await findFolder(accessToken, folderName, parentId);
-    if (existingId) return existingId;
-    return await createFolder(accessToken, folderName, parentId);
+async function ensureFolder(token: string, name: string, parentId?: string): Promise<string> {
+    return await findFolder(token, name, parentId) || await createFolder(token, name, parentId);
 }
 
-async function uploadToDrive(
-    accessToken: string,
-    base64Data: string,
-    mimeType: string,
-    fileName: string,
-    expenseDate: Date
-): Promise<string> {
-    // Create folder structure: Escher Finance Manager / Year / Month
-    const rootFolderId = await ensureFolder(accessToken, 'Escher Finance Manager');
-    const yearFolderId = await ensureFolder(accessToken, expenseDate.getFullYear().toString(), rootFolderId);
-    const monthFolderId = await ensureFolder(accessToken, MONTH_NAMES[expenseDate.getMonth()], yearFolderId);
+async function uploadToDrive(token: string, base64: string, mime: string, fileName: string, date: Date): Promise<string> {
+    const root = await ensureFolder(token, 'Escher Finance Manager');
+    const year = await ensureFolder(token, date.getFullYear().toString(), root);
+    const month = await ensureFolder(token, MONTH_NAMES[date.getMonth()], year);
 
-    // Upload file
-    const metadata = {
-        name: fileName,
-        mimeType: mimeType,
-        parents: [monthFolderId],
-    };
-
-    // Convert base64 to binary
-    const binaryString = atob(base64Data);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
     const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', new Blob([bytes], { type: mimeType }));
+    form.append('metadata', new Blob([JSON.stringify({ name: fileName, mimeType: mime, parents: [month] })], { type: 'application/json' }));
+    form.append('file', new Blob([bytes], { type: mime }));
 
-    const uploadResponse = await fetch(DRIVE_UPLOAD_URL, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: form,
-    });
+    const res = await fetch(DRIVE_UPLOAD_URL, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+    if (!res.ok) throw new Error('Drive upload failed');
+    const fileId = (await res.json()).id;
 
-    if (!uploadResponse.ok) {
-        throw new Error('Failed to upload to Google Drive');
-    }
-
-    const fileData = await uploadResponse.json();
-    const fileId = fileData.id;
-
-    // Make file publicly viewable
     await fetch(`${DRIVE_API_URL}/files/${fileId}/permissions`, {
         method: 'POST',
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'reader', type: 'anyone' })
     });
 
     return `https://drive.google.com/file/d/${fileId}/view`;
 }
 
-// ============= GOOGLE SHEETS APPEND =============
-
-async function appendToSheet(
-    accessToken: string,
-    spreadsheetId: string,
-    expense: ProcessedExpense
-): Promise<void> {
-    const row = [
-        expense.id,
-        expense.date,
-        expense.category,
-        expense.description,
-        expense.amount,
-        expense.receiptUrl,
-        '' // budgetItemName (empty for API-created expenses)
-    ];
-
-    const response = await fetch(
-        `${SHEETS_API_URL}/${spreadsheetId}/values/Expenses!A:G:append?valueInputOption=USER_ENTERED`,
-        {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${accessToken}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ values: [row] }),
-        }
-    );
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to append to Google Sheets: ${errorText}`);
-    }
+// ============= GOOGLE SHEETS =============
+async function appendToSheet(token: string, sheetId: string, expense: ProcessedExpense): Promise<void> {
+    const row = [expense.id, expense.date, expense.category, expense.description, expense.amount, expense.receiptUrl, ''];
+    const res = await fetch(`${SHEETS_API_URL}/${sheetId}/values/Expenses!A:G:append?valueInputOption=USER_ENTERED`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [row] })
+    });
+    if (!res.ok) throw new Error(`Sheets error: ${await res.text()}`);
 }
 
-// ============= MAIN API HANDLER =============
-
+// ============= MAIN HANDLER =============
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY');
 
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
+    if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
-    if (req.method !== 'POST') {
-        return res.status(405).json({ success: false, error: 'Method not allowed' });
-    }
-
-    // API Key authentication
     const apiKey = req.headers['x-api-key'];
-    const expectedApiKey = process.env.RECEIPT_API_KEY;
-
-    if (!expectedApiKey || apiKey !== expectedApiKey) {
+    if (!process.env.RECEIPT_API_KEY || apiKey !== process.env.RECEIPT_API_KEY) {
         return res.status(401).json({ success: false, error: 'Invalid API key' });
     }
 
-    // Get Gemini API key from environment
-    const geminiApiKey = process.env.API_KEY;
-    if (!geminiApiKey) {
-        return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
-    }
+    const geminiKey = process.env.API_KEY;
+    if (!geminiKey) return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
 
     try {
         const { base64Image, mimeType, accessToken, spreadsheetId } = req.body;
-
-        // Validate required fields
         if (!base64Image || !mimeType || !accessToken || !spreadsheetId) {
-            return res.status(400).json({
-                success: false,
-                error: 'Missing required fields: base64Image, mimeType, accessToken, spreadsheetId'
-            });
+            return res.status(400).json({ success: false, error: 'Missing: base64Image, mimeType, accessToken, or spreadsheetId' });
         }
 
-        // 1. Analyze receipt with Gemini
-        const analysis = await analyzeReceipt(base64Image, mimeType, geminiApiKey);
-
+        const analysis = await analyzeReceipt(base64Image, mimeType, geminiKey);
         const expenseDate = analysis.date || new Date().toISOString().split('T')[0];
-        const description = analysis.merchant || 'Receipt Expense';
+        const description = analysis.merchant || 'Receipt';
         const category = BUDGET_CATEGORIES.includes(analysis.category) ? analysis.category : 'Other';
 
-        // 2. Generate expense ID
         const dateSlug = expenseDate.replace(/-/g, '');
         const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
         const expenseId = `${dateSlug}-${category.replace(/\s+/g, '')}-${descSlug}`;
 
-        // 3. Upload receipt to Google Drive
-        const fileName = `receipt-${expenseId}.${mimeType.split('/')[1] || 'jpg'}`;
-        const receiptUrl = await uploadToDrive(
-            accessToken,
-            base64Image,
-            mimeType,
-            fileName,
-            new Date(expenseDate)
-        );
+        const receiptUrl = await uploadToDrive(accessToken, base64Image, mimeType, `receipt-${expenseId}.jpg`, new Date(expenseDate));
 
-        // 4. Create expense object
-        const expense: ProcessedExpense = {
-            id: expenseId,
-            date: expenseDate,
-            category: category,
-            description: description,
-            amount: analysis.amount,
-            receiptUrl: receiptUrl
-        };
-
-        // 5. Append to Google Sheets
+        const expense: ProcessedExpense = { id: expenseId, date: expenseDate, category, description, amount: analysis.amount, receiptUrl };
         await appendToSheet(accessToken, spreadsheetId, expense);
 
-        // 6. Return success
-        return res.status(200).json({
-            success: true,
-            expense: expense
-        });
-
+        return res.status(200).json({ success: true, expense });
     } catch (error: any) {
-        console.error('Process receipt error:', error);
-        return res.status(500).json({
-            success: false,
-            error: error.message || 'Internal server error'
-        });
+        console.error('Error:', error);
+        return res.status(500).json({ success: false, error: error.message || 'Internal error' });
     }
 }
