@@ -61,16 +61,24 @@ async function createFolder(token: string, name: string, parentId?: string): Pro
         body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', ...(parentId && { parents: [parentId] }) })
     });
     if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Drive folder creation failed:', res.status, errorText);
+        // Try to find existing folder as fallback
         const existing = await findFolder(token, name, parentId);
         if (existing) return existing;
-        throw new Error('Failed to create folder');
+        throw new Error(`Failed to create folder "${name}": ${errorText}`);
     }
     return (await res.json()).id;
 }
 
 async function ensureFolder(token: string, name: string, parentId?: string): Promise<string> {
-    return await findFolder(token, name, parentId) || await createFolder(token, name, parentId);
+    // First try to find existing folder
+    const existing = await findFolder(token, name, parentId);
+    if (existing) return existing;
+    // If not found, create it
+    return await createFolder(token, name, parentId);
 }
+
 
 async function uploadToDrive(token: string, base64: string, mime: string, fileName: string, date: Date): Promise<string> {
     const root = await ensureFolder(token, 'Escher Finance Manager');
