@@ -9,6 +9,7 @@ import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserS
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
 import { isTokenExpired, silentRefreshToken } from './services/authService';
+import { requestNotificationPermission, subscribeToPush, showLocalNotification, isNotificationPermissionGranted } from './services/pushNotificationService';
 import { Expense, BudgetLineItem, User } from './types';
 import { DEFAULT_BUDGET_ITEMS } from './constants';
 import { Loader2 } from 'lucide-react';
@@ -128,6 +129,42 @@ export default function App() {
         const parsedExpenses = parseExpensesFromSheet(expensesData.values);
         setExpenses(parsedExpenses);
 
+        // Send notification for new expense
+        if (isNotificationPermissionGranted()) {
+          await showLocalNotification(
+            '💰 Expense Logged',
+            `$${expense.amount.toFixed(2)} spent on ${expense.category}${expense.description ? ': ' + expense.description : ''}`
+          );
+
+          // Check budget threshold for this category
+          const categoryBudget = budgetItems
+            .filter(item => item.category === expense.category)
+            .reduce((sum, item) => sum + (item.frequency === 'Monthly' ? item.amount : item.amount / 12), 0);
+
+          if (categoryBudget > 0) {
+            // Calculate total spent in this category this month
+            const now = new Date();
+            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+            const categorySpent = parsedExpenses
+              .filter(e => e.category === expense.category && e.date >= monthStart)
+              .reduce((sum, e) => sum + e.amount, 0);
+
+            const percentUsed = (categorySpent / categoryBudget) * 100;
+
+            if (percentUsed >= 100) {
+              await showLocalNotification(
+                '🚨 Budget Exceeded!',
+                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget ($${categorySpent.toFixed(2)} / $${categoryBudget.toFixed(2)})`
+              );
+            } else if (percentUsed >= 80) {
+              await showLocalNotification(
+                '⚠️ Budget Alert',
+                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget ($${categorySpent.toFixed(2)} / $${categoryBudget.toFixed(2)})`
+              );
+            }
+          }
+        }
+
       } catch (error: any) {
         console.error("Save Error", error);
         if (error.message === 'TOKEN_EXPIRED') {
@@ -176,9 +213,16 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login onLoginSuccess={(u) => {
+    return <Login onLoginSuccess={async (u) => {
       saveUserSession(u);
       setUser(u);
+
+      // Request notification permission after login
+      const permission = await requestNotificationPermission();
+      if (permission === 'granted') {
+        await subscribeToPush();
+        console.log('Push notifications enabled');
+      }
     }} />;
   }
 
