@@ -1,9 +1,9 @@
-const CACHE_NAME = 'escher-cache-v8';
+const CACHE_NAME = 'escher-cache-v9';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon-512.jpg'
+  '/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
