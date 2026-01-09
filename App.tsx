@@ -5,6 +5,7 @@ import ExpenseLogger from './components/ExpenseLogger';
 import BudgetTable from './components/BudgetTable';
 import ChatAssistant from './components/ChatAssistant';
 import Login from './components/Login';
+import SplashScreen from './components/SplashScreen';
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
@@ -203,13 +204,9 @@ export default function App() {
     }
   };
 
-  // Show a blank screen or spinner while checking local storage to prevent login flicker
+  // Show animated splash screen while checking local storage
   if (isInitializing) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   if (!user) {
