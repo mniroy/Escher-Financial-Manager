@@ -8,6 +8,7 @@ import Login from './components/Login';
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
+import { isTokenExpired, silentRefreshToken } from './services/authService';
 import { Expense, BudgetLineItem, User } from './types';
 import { DEFAULT_BUDGET_ITEMS } from './constants';
 import { Loader2 } from 'lucide-react';
@@ -30,7 +31,23 @@ export default function App() {
       // User Session
       const storedUser = getUserSession();
       if (storedUser) {
-        setUser(storedUser);
+        // Check if token is expired and try to refresh
+        if (isTokenExpired(storedUser)) {
+          console.log('Token expired, attempting silent refresh...');
+          const refreshedUser = await silentRefreshToken(storedUser);
+          if (refreshedUser) {
+            console.log('Token refreshed successfully');
+            saveUserSession(refreshedUser);
+            setUser(refreshedUser);
+          } else {
+            console.log('Silent refresh failed, user needs to re-login');
+            clearUserSession();
+            // User will see login screen
+          }
+        } else {
+          // Token still valid
+          setUser(storedUser);
+        }
       }
 
       // Load persisted mode

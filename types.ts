@@ -60,4 +60,5 @@ export interface User {
   picture: string;
   accessToken: string; // OAuth access token
   spreadsheetId?: string;
+  tokenExpiry?: number; // Timestamp when the access token expires
 }
