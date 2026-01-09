@@ -104,23 +104,31 @@ async function appendToSheet(token: string, sheetId: string, expense: ProcessedE
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY, Authorization');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(405).json({ success: false, error: 'Method not allowed' });
 
+    // API Key authentication (your custom key)
     const apiKey = req.headers['x-api-key'];
     if (!process.env.RECEIPT_API_KEY || apiKey !== process.env.RECEIPT_API_KEY) {
         return res.status(401).json({ success: false, error: 'Invalid API key' });
     }
 
+    // Get Google OAuth token from Authorization header (Bearer token)
+    const authHeader = req.headers['authorization'] as string;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, error: 'Missing Authorization header (Bearer token)' });
+    }
+    const googleAccessToken = authHeader.replace('Bearer ', '');
+
     const geminiKey = process.env.API_KEY;
     if (!geminiKey) return res.status(500).json({ success: false, error: 'Gemini API key not configured' });
 
     try {
-        const { base64Image, mimeType, accessToken, spreadsheetId } = req.body;
-        if (!base64Image || !mimeType || !accessToken || !spreadsheetId) {
-            return res.status(400).json({ success: false, error: 'Missing: base64Image, mimeType, accessToken, or spreadsheetId' });
+        const { base64Image, mimeType, spreadsheetId } = req.body;
+        if (!base64Image || !mimeType || !spreadsheetId) {
+            return res.status(400).json({ success: false, error: 'Missing: base64Image, mimeType, or spreadsheetId' });
         }
 
         const analysis = await analyzeReceipt(base64Image, mimeType, geminiKey);
@@ -132,10 +140,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
         const expenseId = `${dateSlug}-${category.replace(/\s+/g, '')}-${descSlug}`;
 
-        const receiptUrl = await uploadToDrive(accessToken, base64Image, mimeType, `receipt-${expenseId}.jpg`, new Date(expenseDate));
+        const receiptUrl = await uploadToDrive(googleAccessToken, base64Image, mimeType, `receipt-${expenseId}.jpg`, new Date(expenseDate));
 
         const expense: ProcessedExpense = { id: expenseId, date: expenseDate, category, description, amount: analysis.amount, receiptUrl };
-        await appendToSheet(accessToken, spreadsheetId, expense);
+        await appendToSheet(googleAccessToken, spreadsheetId, expense);
 
         return res.status(200).json({ success: true, expense });
     } catch (error: any) {
