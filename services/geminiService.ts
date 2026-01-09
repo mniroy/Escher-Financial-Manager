@@ -26,7 +26,7 @@ export const analyzeReceipt = async (base64Image: string, mimeType: string): Pro
   const categoriesList = Object.values(BudgetCategory).join(', ');
   
   const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.0-flash',
     contents: {
       parts: [
         {
