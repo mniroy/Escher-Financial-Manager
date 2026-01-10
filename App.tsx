@@ -4,19 +4,20 @@ import Dashboard from './components/Dashboard';
 import ExpenseLogger from './components/ExpenseLogger';
 import BudgetTable from './components/BudgetTable';
 import ChatAssistant from './components/ChatAssistant';
+import TransactionList from './components/TransactionList';
 import Login from './components/Login';
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
-import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet } from './services/googleSheetsService';
+import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
 import { isTokenExpired, silentRefreshToken } from './services/authService';
 import { requestNotificationPermission, subscribeToPush, showLocalNotification, isNotificationPermissionGranted } from './services/pushNotificationService';
 import { Expense, BudgetLineItem, User } from './types';
-import { DEFAULT_BUDGET_ITEMS } from './constants';
+import { DEFAULT_BUDGET_ITEMS, formatCurrency } from './constants';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'chat' | 'budget'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
@@ -133,7 +134,7 @@ export default function App() {
         if (isNotificationPermissionGranted()) {
           await showLocalNotification(
             '💰 Expense Logged',
-            `$${expense.amount.toFixed(2)} spent on ${expense.category}${expense.description ? ': ' + expense.description : ''}`
+            `${formatCurrency(expense.amount)} spent on ${expense.category}${expense.description ? ': ' + expense.description : ''}`
           );
 
           // Check budget threshold for this category
@@ -154,12 +155,12 @@ export default function App() {
             if (percentUsed >= 100) {
               await showLocalNotification(
                 '🚨 Budget Exceeded!',
-                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget ($${categorySpent.toFixed(2)} / $${categoryBudget.toFixed(2)})`
+                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget (${formatCurrency(categorySpent)} / ${formatCurrency(categoryBudget)})`
               );
             } else if (percentUsed >= 80) {
               await showLocalNotification(
                 '⚠️ Budget Alert',
-                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget ($${categorySpent.toFixed(2)} / $${categoryBudget.toFixed(2)})`
+                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget (${formatCurrency(categorySpent)} / ${formatCurrency(categoryBudget)})`
               );
             }
           }
@@ -200,6 +201,50 @@ export default function App() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEditExpense = async (updatedExpense: Expense) => {
+    if (!user) return;
+    try {
+      // Update in local state
+      const updatedExpenses = expenses.map(e =>
+        e.id === updatedExpense.id ? updatedExpense : e
+      );
+      setExpenses(updatedExpenses);
+
+      // Save to Google Sheets
+      await saveExpensesToSheet(user, updatedExpenses);
+    } catch (error: any) {
+      console.error("Edit Expense Error", error);
+      if (error.message === 'TOKEN_EXPIRED') {
+        alert("Session expired. Please log in again.");
+        handleLogout();
+      } else {
+        alert("Failed to update expense. Please try again.");
+        loadData(user);
+      }
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (!user) return;
+    try {
+      // Remove from local state
+      const updatedExpenses = expenses.filter(e => e.id !== expenseId);
+      setExpenses(updatedExpenses);
+
+      // Save to Google Sheets
+      await saveExpensesToSheet(user, updatedExpenses);
+    } catch (error: any) {
+      console.error("Delete Expense Error", error);
+      if (error.message === 'TOKEN_EXPIRED') {
+        alert("Session expired. Please log in again.");
+        handleLogout();
+      } else {
+        alert("Failed to delete expense. Please try again.");
+        loadData(user);
+      }
     }
   };
 
@@ -257,6 +302,13 @@ export default function App() {
           appMode={appMode}
           activePlan={activePlan}
           onModeChange={handleModeChange}
+        />
+      )}
+      {activeTab === 'transactions' && (
+        <TransactionList
+          expenses={expenses}
+          onEditExpense={handleEditExpense}
+          onDeleteExpense={handleDeleteExpense}
         />
       )}
       {activeTab === 'chat' && (

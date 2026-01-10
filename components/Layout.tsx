@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Settings as SettingsIcon, Download, RefreshCw, LogOut, MessageSquare } from 'lucide-react';
+import { Settings as SettingsIcon, Download, RefreshCw, LogOut, MessageSquare, Receipt } from 'lucide-react';
 import { User } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'chat' | 'budget';
-  setActiveTab: (tab: 'dashboard' | 'chat' | 'budget') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget') => void;
   onRefresh?: () => Promise<void>;
   user: User;
   onLogout: () => void;
@@ -25,7 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
   const [swipeStartY, setSwipeStartY] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
 
-  const tabs: Array<'dashboard' | 'chat' | 'budget'> = ['dashboard', 'chat', 'budget'];
+  const tabs: Array<'dashboard' | 'transactions' | 'chat' | 'budget'> = ['dashboard', 'transactions', 'chat', 'budget'];
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -167,6 +167,14 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
                 }`}
             >
               Overview
+            </button>
+            <button
+              onClick={() => setActiveTab('transactions')}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'transactions' ? 'bg-indigo-800 shadow-sm ring-1 ring-indigo-400/30' : 'hover:bg-indigo-500'
+                }`}
+            >
+              <Receipt className="w-4 h-4" />
+              Transactions
             </button>
             <button
               onClick={() => setActiveTab('chat')}

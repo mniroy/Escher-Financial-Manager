@@ -3,7 +3,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cart
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
 import { exportToCSV } from '../services/storageService';
-import { Download, Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, AlertTriangle, ArrowUpDown } from 'lucide-react';
+import { Download, Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, AlertTriangle } from 'lucide-react';
 import ExpenseLogger from './ExpenseLogger';
 
 interface DashboardProps {
@@ -28,7 +28,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showLogger, setShowLogger] = useState(false);
-  const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();
@@ -413,117 +412,6 @@ const Dashboard: React.FC<DashboardProps> = ({
               <p className="text-xs text-center">Configure Google Sheets in Settings to load your plan</p>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Transactions List */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Transactions</h3>
-            <p className="text-sm text-gray-500">{dateLabel}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <ArrowUpDown className="w-4 h-4 text-gray-400" />
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as 'date' | 'category')}
-              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="date">Sort by Date</option>
-              <option value="category">Sort by Category</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Mobile View: Card List */}
-        <div className="md:hidden max-h-[400px] overflow-y-auto">
-          {filteredExpenses.length === 0 ? (
-            <div className="p-6 text-center text-gray-500 text-sm">No expenses found for {dateLabel}.</div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {filteredExpenses
-                .slice()
-                .sort((a, b) => {
-                  if (sortBy === 'category') {
-                    return a.category.localeCompare(b.category);
-                  }
-                  return new Date(b.date).getTime() - new Date(a.date).getTime();
-                })
-                .map((expense) => (
-                  <div key={expense.id} className="p-4 flex flex-col gap-2">
-                    <div className="flex justify-between items-start">
-                      <span className="font-semibold text-gray-900">{expense.description}</span>
-                      <span className="font-bold text-gray-900">{formatCurrency(expense.amount)}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs text-gray-500">
-                      <div className="flex items-center gap-2">
-                        <span>{expense.date}</span>
-                        <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
-                          {expense.category}
-                        </span>
-                      </div>
-                      {expense.budgetItemName && (
-                        <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-100">
-                          {expense.budgetItemName}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </div>
-
-        {/* Desktop View: Table */}
-        <div className="hidden md:block overflow-x-auto max-h-[400px] overflow-y-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredExpenses.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500">No expenses found for {dateLabel}.</td>
-                </tr>
-              ) : (
-                filteredExpenses
-                  .slice()
-                  .sort((a, b) => {
-                    if (sortBy === 'category') {
-                      return a.category.localeCompare(b.category);
-                    }
-                    return new Date(b.date).getTime() - new Date(a.date).getTime();
-                  })
-                  .map((expense) => (
-                    <tr key={expense.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{expense.date}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {expense.category}
-                          </span>
-                          {expense.budgetItemName && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800">
-                              {expense.budgetItemName}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{expense.description}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900 font-medium">
-                        {formatCurrency(expense.amount)}
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
     </div>
