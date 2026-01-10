@@ -159,7 +159,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
     };
 
     return (
-        <div className="p-3 space-y-3">
+        <div className="flex flex-col gap-3 p-3 h-full overflow-hidden">
             {/* Compact Header with Stats */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -360,7 +360,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
             </div>
 
             {/* Transaction List */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 min-h-0 flex flex-col overflow-hidden">
                 {sortedExpenses.length === 0 ? (
                     <div className="p-8 text-center text-gray-500">
                         <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-300" />
@@ -370,7 +370,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 ) : (
                     <>
                         {/* Mobile View - Compact */}
-                        <div className="md:hidden divide-y divide-gray-100 max-h-[65vh] overflow-y-auto">
+                        <div className="md:hidden divide-y divide-gray-100 flex-1 overflow-y-auto overscroll-contain">
                             {sortedExpenses.map((expense) => {
                                 const expDate = new Date(expense.date);
                                 return (
@@ -417,7 +417,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         </div>
 
                         {/* Desktop View - Compact */}
-                        <div className="hidden md:block overflow-x-auto max-h-[65vh] overflow-y-auto">
+                        <div className="hidden md:flex md:flex-col flex-1 overflow-y-auto overscroll-contain">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50 sticky top-0">
                                     <tr>
