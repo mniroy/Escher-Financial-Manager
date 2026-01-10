@@ -59,38 +59,32 @@ The incoming data should include:
 
 ---
 
-### Node 2: Get OAuth Token (Code Node)
+### Node 2: Get OAuth Token (HTTP Request)
 
-This node extracts a fresh OAuth token from n8n's credential system.
+This node calls a helper endpoint on your Vercel app that echoes back the OAuth token.
 
-1. Add a **Code** node, name it `Get Access Token`
-2. Set **Mode** to `Run Once for All Items`
-3. Paste this code:
+1. Add an **HTTP Request** node, name it `Get Access Token`
+2. Configure:
+   - **Method:** `GET`
+   - **URL:** `https://your-app.vercel.app/api/get-token`
+   - **Authentication:** `Predefined Credential Type`
+   - **Credential Type:** `Google Drive OAuth2 API`
+   - **Credential:** Select your `Google Drive account`
 
-```javascript
-// Get the Google OAuth2 credential
-// IMPORTANT: Change 'googleDriveOAuth2Api' if your credential has a different internal name
-const credentials = await this.getCredentials('googleDriveOAuth2Api');
+3. Leave everything else as default
 
-// n8n automatically refreshes the token if expired
-const accessToken = credentials.oauthTokenData?.access_token;
+**What happens:**
+- n8n adds the OAuth token to the `Authorization: Bearer xxx` header
+- Your Vercel endpoint echoes back the token
+- The response contains: `{ "success": true, "access_token": "ya29.xxx..." }`
 
-if (!accessToken) {
-  throw new Error('Could not get Google access token. Check your Google Drive OAuth2 credential.');
+**Output:**
+```json
+{
+  "success": true,
+  "access_token": "ya29.a0AfH6SMB..."
 }
-
-// Pass everything through with the token added
-return $input.all().map(item => ({
-  json: {
-    ...item.json,
-    googleAccessToken: accessToken
-  }
-}));
 ```
-
-> **Note:** The credential name `'googleDriveOAuth2Api'` is n8n's internal name for Google Drive OAuth2. If you're using a different Google credential type, the name might be different (e.g., `'googleSheetsOAuth2Api'`).
-
----
 
 ### Node 3: HTTP Request (Call Vercel API)
 
@@ -104,7 +98,7 @@ return $input.all().map(item => ({
    |------|-------|
    | `Content-Type` | `application/json` |
    | `X-API-KEY` | `your-receipt-api-key` |
-   | `Authorization` | `Bearer {{ $json.googleAccessToken }}` |
+   | `Authorization` | `Bearer {{ $json.access_token }}` |
 
 4. **Body → Content Type:** `JSON`
 5. **Body → JSON:**
