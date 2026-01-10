@@ -330,6 +330,8 @@ Repeat the same pattern. Name nodes exactly as shown.
 
 #### Node 3h: Upload Receipt File
 
+> **Important:** Binary data is lost when passing through IF/Merge nodes. We must reference the binary data directly from the source node.
+
 1. Add a **Google Drive** node, name it `Upload Receipt`
 2. Configure:
    - **Credential:** Select your Google Drive OAuth2 credential
@@ -337,17 +339,31 @@ Repeat the same pattern. Name nodes exactly as shown.
    - **Operation:** `Upload`
 
 3. **File Settings:**
-   - **Input Binary Field:** `file`
-   - **File Name** (Expression mode ⚡):
-     ```
-     {{ $node["Convert to Binary"].json.fileName }}
-     ```
-   - **Parent Folder** (Expression mode ⚡):
+   - **Input Data Field Name:** `file`
+   
+4. **File Name** (Expression mode ⚡):
+   ```
+   {{ $node["Convert to Binary"].json.fileName }}
+   ```
+
+5. **Parent Drive:**
+   - **From list:** `My Drive`
+
+6. **Parent Folder:**
+   - **By:** `ID`
+   - **Value** (Expression mode ⚡):
      ```
      {{ $node["Merge Month Folder"].json.id }}
      ```
 
-4. **Options → Add Option → Permissions:**
+7. **Options → Add option → Input Binary Field:**
+   - Since binary data doesn't pass through IF/Merge nodes, we need to reference it directly
+   - **Value:** `file`
+   - **IMPORTANT:** The workflow must be connected so that the Upload Receipt node can access the "Convert to Binary" node's output
+
+> **Alternative if binary still doesn't work:** Instead of passing binary through the workflow, save the binary data to a variable first, or restructure the workflow to upload immediately after Convert to Binary, then move the file to the correct folder.
+
+8. **Options → Add option → Permissions:**
    - Click **Add Permission**
    - **Type:** `Anyone`
    - **Role:** `Reader`
