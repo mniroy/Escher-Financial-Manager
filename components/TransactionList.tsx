@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from 'react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import { Expense, BudgetCategory } from '../types';
 import { formatCurrency } from '../constants';
-import { Calendar, TrendingUp, ArrowUpDown, Pencil, Trash2, X, Save, ChevronLeft, ChevronRight, Plane, Check, Sun } from 'lucide-react';
+import { Calendar, TrendingUp, ArrowUpDown, Pencil, Trash2, X, Save, ChevronLeft, ChevronRight, Plane, Check, Sun, BarChart3 } from 'lucide-react';
 
 interface TransactionListProps {
     expenses: Expense[];
@@ -20,6 +21,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [chartRange, setChartRange] = useState<'week' | 'month'>('week');
+    const [showChart, setShowChart] = useState(true);
 
     const displayedDay = selectedDate.getDate();
     const displayedMonth = selectedDate.getMonth();
@@ -99,6 +102,34 @@ const TransactionList: React.FC<TransactionListProps> = ({
         return uniqueDays > 0 ? totalSpent / uniqueDays : 0;
     }, [viewMode, filteredExpenses, totalSpent]);
 
+    // Chart data - daily spending for week or month
+    const chartData = useMemo(() => {
+        const today = selectedDate;
+        const days = chartRange === 'week' ? 7 : 30;
+        const data = [];
+
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            const dateStr = date.toISOString().split('T')[0];
+
+            const dayTotal = expenses
+                .filter(e => e.date === dateStr)
+                .reduce((sum, e) => sum + e.amount, 0);
+
+            data.push({
+                date: dateStr,
+                label: date.toLocaleDateString('default', { day: 'numeric', month: 'short' }),
+                shortLabel: date.toLocaleDateString('default', { day: 'numeric' }),
+                amount: dayTotal,
+            });
+        }
+        return data;
+    }, [expenses, selectedDate, chartRange]);
+
+    const chartTotal = chartData.reduce((sum, d) => sum + d.amount, 0);
+    const chartAvg = chartData.length > 0 ? chartTotal / chartData.filter(d => d.amount > 0).length || 0 : 0;
+
     const handleEdit = (expense: Expense) => {
         setEditingExpense({ ...expense });
         setIsModalOpen(true);
@@ -138,7 +169,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             <p className="text-xs text-gray-500">{filteredExpenses.length} items</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
                         {viewMode === 'monthly' && dailyAverage > 0 && (
                             <div className="text-right hidden sm:block">
                                 <p className="text-[10px] text-gray-400 uppercase">Daily Avg</p>
@@ -149,6 +180,17 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             <p className="text-[10px] text-gray-400 uppercase">Total</p>
                             <p className="text-lg font-bold text-gray-900">{formatCurrency(totalSpent)}</p>
                         </div>
+                        {/* Chart Toggle */}
+                        <button
+                            onClick={() => setShowChart(!showChart)}
+                            className={`p-2 rounded-full transition-all ${showChart
+                                ? 'bg-indigo-500 text-white shadow-lg'
+                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                                }`}
+                            title={showChart ? "Hide Chart" : "Show Chart"}
+                        >
+                            <BarChart3 className="w-4 h-4" />
+                        </button>
                         {/* Edit Toggle */}
                         <button
                             onClick={() => setIsEditMode(!isEditMode)}
@@ -163,6 +205,84 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     </div>
                 </div>
             </div>
+
+            {/* Spending Chart */}
+            {showChart && (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 className="text-sm font-semibold text-gray-800">Daily Spending</h3>
+                            <p className="text-[10px] text-gray-400">
+                                {chartRange === 'week' ? 'Last 7 days' : 'Last 30 days'} • Avg: {formatCurrency(chartAvg)}/day
+                            </p>
+                        </div>
+                        <div className="bg-gray-100 p-0.5 rounded-lg flex">
+                            <button
+                                onClick={() => setChartRange('week')}
+                                className={`px-2 py-1 text-xs font-medium rounded transition-all ${chartRange === 'week'
+                                    ? 'bg-white text-indigo-600 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Week
+                            </button>
+                            <button
+                                onClick={() => setChartRange('month')}
+                                className={`px-2 py-1 text-xs font-medium rounded transition-all ${chartRange === 'month'
+                                    ? 'bg-white text-indigo-600 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                Month
+                            </button>
+                        </div>
+                    </div>
+                    <div className="h-32">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                                <defs>
+                                    <linearGradient id="colorSpending" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <XAxis
+                                    dataKey={chartRange === 'week' ? 'label' : 'shortLabel'}
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                    interval={chartRange === 'month' ? 4 : 0}
+                                />
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
+                                    tickFormatter={(value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value}
+                                    width={40}
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: '#1f2937',
+                                        border: 'none',
+                                        borderRadius: '8px',
+                                        fontSize: '12px',
+                                        color: '#fff'
+                                    }}
+                                    formatter={(value: number) => [formatCurrency(value), 'Spent']}
+                                    labelFormatter={(label) => label}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="amount"
+                                    stroke="#6366f1"
+                                    strokeWidth={2}
+                                    fill="url(#colorSpending)"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
 
             {/* Controls - More Compact */}
             <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
@@ -214,17 +334,27 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         </button>
                     </div>
 
-                    {/* Sort Dropdown - Compact */}
-                    <div className="flex items-center gap-1">
-                        <ArrowUpDown className="w-3 h-3 text-gray-400" />
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as 'date' | 'category')}
-                            className="text-xs border border-gray-200 rounded-lg px-1.5 py-1.5 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500"
+                    {/* Sort Toggle */}
+                    <div className="bg-gray-100 p-0.5 rounded-lg flex shadow-inner">
+                        <button
+                            onClick={() => setSortBy('date')}
+                            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${sortBy === 'date'
+                                ? 'bg-white text-gray-700 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
                         >
-                            <option value="date">Date</option>
-                            <option value="category">Category</option>
-                        </select>
+                            <ArrowUpDown className="w-3 h-3" />
+                            Date
+                        </button>
+                        <button
+                            onClick={() => setSortBy('category')}
+                            className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${sortBy === 'category'
+                                ? 'bg-white text-gray-700 shadow-sm'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            Category
+                        </button>
                     </div>
                 </div>
             </div>
@@ -241,43 +371,49 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     <>
                         {/* Mobile View - Compact */}
                         <div className="md:hidden divide-y divide-gray-100 max-h-[65vh] overflow-y-auto">
-                            {sortedExpenses.map((expense) => (
-                                <div key={expense.id} className="p-3 flex items-center gap-3">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className="font-medium text-gray-900 text-sm truncate">{expense.description}</span>
-                                            <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{formatCurrency(expense.amount)}</span>
+                            {sortedExpenses.map((expense) => {
+                                const expDate = new Date(expense.date);
+                                return (
+                                    <div key={expense.id} className="p-3 flex items-center gap-3">
+                                        {/* Big Day Number */}
+                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                            <span className="text-sm font-bold text-gray-900">{expDate.getDate()}</span>
                                         </div>
-                                        <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500 flex-wrap">
-                                            <span>{expense.date}</span>
-                                            <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
-                                                {expense.category}
-                                            </span>
-                                            {expense.budgetItemName && (
-                                                <span className="px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
-                                                    {expense.budgetItemName}
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="font-medium text-gray-900 text-sm truncate">{expense.description}</span>
+                                                <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{formatCurrency(expense.amount)}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500 flex-wrap">
+                                                <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
+                                                    {expense.category}
                                                 </span>
-                                            )}
+                                                {expense.budgetItemName && (
+                                                    <span className="px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
+                                                        {expense.budgetItemName}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
+                                        {isEditMode && (
+                                            <div className="flex gap-1 animate-in fade-in slide-in-from-right-2">
+                                                <button
+                                                    onClick={() => handleEdit(expense)}
+                                                    className="p-1.5 text-indigo-600 bg-indigo-50 rounded-md"
+                                                >
+                                                    <Pencil className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(expense.id)}
+                                                    className="p-1.5 text-red-600 bg-red-50 rounded-md"
+                                                >
+                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                    {isEditMode && (
-                                        <div className="flex gap-1 animate-in fade-in slide-in-from-right-2">
-                                            <button
-                                                onClick={() => handleEdit(expense)}
-                                                className="p-1.5 text-indigo-600 bg-indigo-50 rounded-md"
-                                            >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(expense.id)}
-                                                className="p-1.5 text-red-600 bg-red-50 rounded-md"
-                                            >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         {/* Desktop View - Compact */}
@@ -293,38 +429,45 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {sortedExpenses.map((expense) => (
-                                        <tr key={expense.id} className="hover:bg-gray-50">
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">{expense.date}</td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                <div className="flex flex-col items-start gap-0.5">
-                                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
-                                                        {expense.category}
-                                                    </span>
-                                                    {expense.budgetItemName && (
-                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-800">
-                                                            <Plane className="w-2.5 h-2.5 mr-0.5" />
-                                                            {expense.budgetItemName}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{expense.description}</td>
-                                            <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-900 font-medium">
-                                                {formatCurrency(expense.amount)}
-                                            </td>
-                                            {isEditMode && (
-                                                <td className="px-4 py-2 whitespace-nowrap text-right text-sm animate-in fade-in">
-                                                    <button onClick={() => handleEdit(expense)} className="text-indigo-600 hover:text-indigo-900 mx-0.5">
-                                                        <Pencil className="w-4 h-4" />
-                                                    </button>
-                                                    <button onClick={() => handleDelete(expense.id)} className="text-red-600 hover:text-red-900 mx-0.5">
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                    {sortedExpenses.map((expense) => {
+                                        const expDate = new Date(expense.date);
+                                        return (
+                                            <tr key={expense.id} className="hover:bg-gray-50">
+                                                <td className="px-4 py-2 whitespace-nowrap">
+                                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                                                        <span className="text-sm font-bold text-gray-900">{expDate.getDate()}</span>
+                                                    </div>
                                                 </td>
-                                            )}
-                                        </tr>
-                                    ))}
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
+                                                    <div className="flex flex-col items-start gap-0.5">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
+                                                            {expense.category}
+                                                        </span>
+                                                        {expense.budgetItemName && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-800">
+                                                                <Plane className="w-2.5 h-2.5 mr-0.5" />
+                                                                {expense.budgetItemName}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{expense.description}</td>
+                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-900 font-medium">
+                                                    {formatCurrency(expense.amount)}
+                                                </td>
+                                                {isEditMode && (
+                                                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm animate-in fade-in">
+                                                        <button onClick={() => handleEdit(expense)} className="text-indigo-600 hover:text-indigo-900 mx-0.5">
+                                                            <Pencil className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(expense.id)} className="text-red-600 hover:text-red-900 mx-0.5">
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </td>
+                                                )}
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
