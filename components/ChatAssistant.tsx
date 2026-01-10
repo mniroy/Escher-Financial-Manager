@@ -312,7 +312,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200">
+    <div className="flex flex-col h-full bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200">
 
       {/* Messages Area - WhatsApp Style */}
       <div
