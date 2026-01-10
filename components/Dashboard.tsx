@@ -419,7 +419,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* Transactions List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-          <h3 className="text-lg font-semibold">Transactions ({dateLabel})</h3>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">Transactions</h3>
+            <p className="text-sm text-gray-500">{dateLabel}</p>
+          </div>
           <div className="flex items-center gap-2">
             <ArrowUpDown className="w-4 h-4 text-gray-400" />
             <select
