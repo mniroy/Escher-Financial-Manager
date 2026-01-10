@@ -21,7 +21,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [chartRange, setChartRange] = useState<'week' | 'month'>('week');
+    const [chartRange, setChartRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('1W');
     const [showChart, setShowChart] = useState(true);
 
     const displayedDay = selectedDate.getDate();
@@ -102,19 +102,60 @@ const TransactionList: React.FC<TransactionListProps> = ({
         return uniqueDays > 0 ? totalSpent / uniqueDays : 0;
     }, [viewMode, filteredExpenses, totalSpent]);
 
-    // Chart data - daily spending for week or month
+    // Chart data - spending based on range
     const chartData = useMemo(() => {
         const today = selectedDate;
-        const days = chartRange === 'week' ? 7 : 30;
+        let days = 7;
+        switch (chartRange) {
+            case '1D': days = 1; break;
+            case '1W': days = 7; break;
+            case '1M': days = 30; break;
+            case '3M': days = 90; break;
+            case '1Y': days = 365; break;
+            case 'ALL': days = 9999; break;
+        }
         const data = [];
+        const startDate = new Date(today);
+        startDate.setDate(startDate.getDate() - days + 1);
 
-        for (let i = days - 1; i >= 0; i--) {
+        // For ALL, find earliest expense
+        let effectiveDays = days;
+        if (chartRange === 'ALL' && expenses.length > 0) {
+            const sortedDates = expenses.map(e => new Date(e.date).getTime()).sort((a, b) => a - b);
+            const earliest = new Date(sortedDates[0]);
+            effectiveDays = Math.ceil((today.getTime() - earliest.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        }
+
+        // Group by appropriate interval
+        const interval = effectiveDays <= 7 ? 1 : effectiveDays <= 30 ? 1 : effectiveDays <= 90 ? 7 : 30;
+        const groupedData: { [key: string]: number } = {};
+
+        for (let i = effectiveDays - 1; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const dateStr = date.toISOString().split('T')[0];
+            const groupKey = interval === 1 ? dateStr :
+                Math.floor(i / interval).toString();
 
+            if (!groupedData[groupKey]) groupedData[groupKey] = 0;
             const dayTotal = expenses
                 .filter(e => e.date === dateStr)
+                .reduce((sum, e) => sum + e.amount, 0);
+            groupedData[groupKey] += dayTotal;
+        }
+
+        // Convert to array for chart
+        for (let i = Math.min(effectiveDays, chartRange === '1D' ? 24 : 30) - 1; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i * (interval === 1 ? 1 : interval));
+            const dateStr = date.toISOString().split('T')[0];
+
+            const dayTotal = expenses
+                .filter(e => {
+                    const eDate = new Date(e.date);
+                    const diff = Math.floor((date.getTime() - eDate.getTime()) / (1000 * 60 * 60 * 24));
+                    return interval === 1 ? e.date === dateStr : diff >= 0 && diff < interval;
+                })
                 .reduce((sum, e) => sum + e.amount, 0);
 
             data.push({
@@ -124,7 +165,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 amount: dayTotal,
             });
         }
-        return data;
+        return data.slice(-30); // Limit to last 30 points for display
     }, [expenses, selectedDate, chartRange]);
 
     const chartTotal = chartData.reduce((sum, d) => sum + d.amount, 0);
@@ -207,36 +248,31 @@ const TransactionList: React.FC<TransactionListProps> = ({
             </div>
 
             {showChart && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex-shrink-0">
-                    <div className="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 className="text-sm font-semibold text-gray-800">Daily Spending</h3>
-                            <p className="text-[10px] text-gray-400">
-                                {chartRange === 'week' ? 'Last 7 days' : 'Last 30 days'} • Avg: {formatCurrency(chartAvg)}/day
-                            </p>
-                        </div>
-                        <div className="bg-gray-100 p-0.5 rounded-lg flex">
-                            <button
-                                onClick={() => setChartRange('week')}
-                                className={`px-2 py-1 text-xs font-medium rounded transition-all ${chartRange === 'week'
-                                    ? 'bg-white text-indigo-600 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                            >
-                                Week
-                            </button>
-                            <button
-                                onClick={() => setChartRange('month')}
-                                className={`px-2 py-1 text-xs font-medium rounded transition-all ${chartRange === 'month'
-                                    ? 'bg-white text-indigo-600 shadow-sm'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                            >
-                                Month
-                            </button>
-                        </div>
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex-shrink-0">
+                    {/* Total Display */}
+                    <div className="mb-2">
+                        <p className="text-2xl font-bold text-gray-900">{formatCurrency(chartTotal)}</p>
+                        <p className="text-xs text-gray-400">Avg: {formatCurrency(chartAvg)}/day</p>
                     </div>
-                    <div className="h-32">
+
+                    {/* Range Selector - Like stock chart */}
+                    <div className="flex justify-around mb-3 border-b border-gray-100 pb-2">
+                        {(['1D', '1W', '1M', '3M', '1Y', 'ALL'] as const).map((range) => (
+                            <button
+                                key={range}
+                                onClick={() => setChartRange(range)}
+                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${chartRange === range
+                                        ? 'bg-gray-100 text-gray-900 border border-gray-300'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                    }`}
+                            >
+                                {range}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Chart */}
+                    <div className="h-28">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                                 <defs>
@@ -246,25 +282,18 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                     </linearGradient>
                                 </defs>
                                 <XAxis
-                                    dataKey={chartRange === 'week' ? 'label' : 'shortLabel'}
+                                    dataKey="shortLabel"
                                     axisLine={false}
                                     tickLine={false}
-                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
-                                    interval={chartRange === 'month' ? 4 : 0}
-                                />
-                                <YAxis
-                                    axisLine={false}
-                                    tickLine={false}
-                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
-                                    tickFormatter={(value) => value >= 1000000 ? `${(value / 1000000).toFixed(1)}M` : value >= 1000 ? `${(value / 1000).toFixed(0)}K` : value}
-                                    width={40}
+                                    tick={{ fontSize: 9, fill: '#9ca3af' }}
+                                    interval={'preserveStartEnd'}
                                 />
                                 <Tooltip
                                     contentStyle={{
                                         backgroundColor: '#1f2937',
                                         border: 'none',
                                         borderRadius: '8px',
-                                        fontSize: '12px',
+                                        fontSize: '11px',
                                         color: '#fff'
                                     }}
                                     formatter={(value: number) => [formatCurrency(value), 'Spent']}
@@ -274,7 +303,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                     type="monotone"
                                     dataKey="amount"
                                     stroke="#6366f1"
-                                    strokeWidth={2}
+                                    strokeWidth={1.5}
                                     fill="url(#colorSpending)"
                                 />
                             </AreaChart>
