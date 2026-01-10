@@ -161,7 +161,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
     return (
         <div className="flex flex-col gap-3 p-3 h-full overflow-hidden">
             {/* Compact Header with Stats */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex-shrink-0">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-3">
                         <div>
@@ -206,9 +206,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 </div>
             </div>
 
-            {/* Spending Chart */}
             {showChart && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex-shrink-0">
                     <div className="flex items-center justify-between mb-3">
                         <div>
                             <h3 className="text-sm font-semibold text-gray-800">Daily Spending</h3>
@@ -285,7 +284,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
             )}
 
             {/* Controls - More Compact */}
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
                 {/* Date Navigation */}
                 <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
                     <button onClick={handlePrev} className="p-1.5 hover:bg-gray-200 rounded-l-md transition-colors">
