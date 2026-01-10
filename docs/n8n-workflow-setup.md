@@ -186,11 +186,13 @@ return [{
 
 1. Add an **IF** node, **name it `Check Root Exists`**
 2. Configure **Conditions:**
-   - **Value 1:** `{{ $json.length }}` (toggle to Expression mode ⚡)
+   - **Value 1:** `{{ $json.id }}` (toggle to Expression mode ⚡)
    - **Operation:** `Is Not Empty`
 
-**True branch** → Root folder exists, passes the found folder
-**False branch** → Root folder doesn't exist, create it
+> **Why `$json.id`?** When the search returns a folder, `$json` is that folder object with properties like `id`, `name`. We check if `id` exists to know if a folder was found.
+
+**True branch** → Root folder exists (has an id), passes the found folder
+**False branch** → No folder found (empty result), create it
 
 ---
 
@@ -248,8 +250,8 @@ This section requires 4 sub-nodes. Name them exactly as shown for the expression
 
 1. Add an **IF** node, name it `Check Year Exists`
 2. Configure **Conditions:**
-   - **Value 1:** `{{ $json.length }}` (Expression mode)
-   - **Operation:** `Is Not Empty` or `Greater Than 0`
+   - **Value 1:** `{{ $json.id }}` (Expression mode)
+   - **Operation:** `Is Not Empty`
 
 ##### Node: "Create Year Folder" (Google Drive - False Branch)
 
@@ -298,8 +300,8 @@ Repeat the same pattern. Name nodes exactly as shown.
 
 1. Add an **IF** node, name it `Check Month Exists`
 2. Configure **Conditions:**
-   - **Value 1:** `{{ $json.length }}` (Expression mode)
-   - **Operation:** `Is Not Empty` or `Greater Than 0`
+   - **Value 1:** `{{ $json.id }}` (Expression mode)
+   - **Operation:** `Is Not Empty`
 
 ##### Node: "Create Month Folder" (Google Drive - False Branch)
 
