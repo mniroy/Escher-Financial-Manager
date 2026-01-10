@@ -199,11 +199,21 @@ return [{
 
 #### Node 3e: Merge Node
 
-1. Add a **Merge** node to combine both branches
-2. Set **Mode** to `Combine`
-3. Set **Combine By:** `Merging By Index`
+Connect both the **True** branch (from IF node) and **False** branch (from Create Folder node) to this Merge node.
 
-This ensures we have the root folder ID regardless of which path we took.
+1. Add a **Merge** node
+2. Connect **Input 1** ← True branch output (found folder)
+3. Connect **Input 2** ← False branch output (created folder)
+4. Configure:
+   - **Mode:** `Append`
+
+**Why Append?** Only one branch executes at a time:
+- If folder exists → True branch returns the found folder ID
+- If folder doesn't exist → False branch creates and returns the new folder ID
+
+Append mode simply passes through whichever input has data to the next node.
+
+**Output:** The folder ID will be available as `{{ $json.id }}` for the next step.
 
 ---
 
