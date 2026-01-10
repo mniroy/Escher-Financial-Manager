@@ -3,7 +3,7 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, Cart
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
 import { exportToCSV } from '../services/storageService';
-import { Download, Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, AlertTriangle } from 'lucide-react';
+import { Download, Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, AlertTriangle, ArrowUpDown } from 'lucide-react';
 import ExpenseLogger from './ExpenseLogger';
 
 interface DashboardProps {
@@ -28,6 +28,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showLogger, setShowLogger] = useState(false);
+  const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();
@@ -417,19 +418,35 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Transactions List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
           <h3 className="text-lg font-semibold">Transactions ({dateLabel})</h3>
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-gray-400" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'date' | 'category')}
+              className="text-sm border border-gray-200 rounded-lg px-2 py-1.5 bg-gray-50 focus:ring-indigo-500 focus:border-indigo-500"
+            >
+              <option value="date">Sort by Date</option>
+              <option value="category">Sort by Category</option>
+            </select>
+          </div>
         </div>
 
         {/* Mobile View: Card List */}
-        <div className="md:hidden">
+        <div className="md:hidden max-h-[400px] overflow-y-auto">
           {filteredExpenses.length === 0 ? (
             <div className="p-6 text-center text-gray-500 text-sm">No expenses found for {dateLabel}.</div>
           ) : (
             <div className="divide-y divide-gray-100">
               {filteredExpenses
                 .slice()
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .sort((a, b) => {
+                  if (sortBy === 'category') {
+                    return a.category.localeCompare(b.category);
+                  }
+                  return new Date(b.date).getTime() - new Date(a.date).getTime();
+                })
                 .map((expense) => (
                   <div key={expense.id} className="p-4 flex flex-col gap-2">
                     <div className="flex justify-between items-start">
@@ -456,7 +473,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
 
         {/* Desktop View: Table */}
-        <div className="hidden md:block overflow-x-auto">
+        <div className="hidden md:block overflow-x-auto max-h-[400px] overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -474,7 +491,12 @@ const Dashboard: React.FC<DashboardProps> = ({
               ) : (
                 filteredExpenses
                   .slice()
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .sort((a, b) => {
+                    if (sortBy === 'category') {
+                      return a.category.localeCompare(b.category);
+                    }
+                    return new Date(b.date).getTime() - new Date(a.date).getTime();
+                  })
                   .map((expense) => (
                     <tr key={expense.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{expense.date}</td>
