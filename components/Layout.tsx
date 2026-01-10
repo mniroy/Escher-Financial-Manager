@@ -24,6 +24,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
   const [swipeStartX, setSwipeStartX] = useState(0);
   const [swipeStartY, setSwipeStartY] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [swipeOffset, setSwipeOffset] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right' | null>(null);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   const tabs: Array<'dashboard' | 'transactions' | 'chat' | 'budget'> = ['dashboard', 'transactions', 'chat', 'budget'];
 
@@ -69,6 +72,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     // Detect if this is a horizontal swipe (more horizontal than vertical)
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
       setIsSwiping(true);
+      // Set swipe offset for live feedback (limit to ±100px for visual effect)
+      const limitedOffset = Math.max(-100, Math.min(100, diffX * 0.5));
+      setSwipeOffset(limitedOffset);
     }
 
     // Pull to refresh logic (only if not horizontal swiping)
@@ -93,10 +99,22 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
       if (diffX < 0 && currentIndex < tabs.length - 1) {
         // Swipe left -> next tab
-        setActiveTab(tabs[currentIndex + 1]);
+        setSlideDirection('left');
+        setIsAnimating(true);
+        setTimeout(() => {
+          setActiveTab(tabs[currentIndex + 1]);
+          setSlideDirection(null);
+          setIsAnimating(false);
+        }, 200);
       } else if (diffX > 0 && currentIndex > 0) {
         // Swipe right -> previous tab
-        setActiveTab(tabs[currentIndex - 1]);
+        setSlideDirection('right');
+        setIsAnimating(true);
+        setTimeout(() => {
+          setActiveTab(tabs[currentIndex - 1]);
+          setSlideDirection(null);
+          setIsAnimating(false);
+        }, 200);
       }
     }
 
@@ -104,6 +122,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     setSwipeStartX(0);
     setSwipeStartY(0);
     setIsSwiping(false);
+    setSwipeOffset(0);
 
     // Pull to refresh logic
     if (!onRefresh) {
@@ -220,6 +239,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       <main
         ref={contentRef}
         className="flex-1 flex flex-col w-full max-w-5xl mx-auto overflow-hidden min-h-0"
+        style={{
+          transform: isAnimating
+            ? `translateX(${slideDirection === 'left' ? '-30%' : '30%'})`
+            : `translateX(${swipeOffset}px)`,
+          opacity: isAnimating ? 0 : 1,
+          transition: isSwiping ? 'none' : 'transform 0.2s ease-out, opacity 0.15s ease-out'
+        }}
       >
         {children}
       </main>

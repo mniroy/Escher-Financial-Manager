@@ -275,148 +275,152 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
   };
 
   return (
-    <div className="space-y-6 pb-20 md:pb-6 relative">
-      {/* Top Summary Card */}
-      <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        <div className="space-y-6 pb-20 md:pb-6 relative">
+          {/* Top Summary Card */}
+          <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
 
-        {/* Toggle Edit Button in Summary Box */}
-        <button
-          onClick={() => setIsEditMode(!isEditMode)}
-          className={`absolute top-3 right-3 z-20 p-2 rounded-full transition-all ${isEditMode
-              ? 'bg-emerald-500 text-white shadow-lg'
-              : 'bg-white/10 text-indigo-200 hover:bg-white/20 hover:text-white'
-            }`}
-          title={isEditMode ? "Done Editing" : "Edit Plan"}
-        >
-          {isEditMode ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
-        </button>
+            {/* Toggle Edit Button in Summary Box */}
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={`absolute top-3 right-3 z-20 p-2 rounded-full transition-all ${isEditMode
+                ? 'bg-emerald-500 text-white shadow-lg'
+                : 'bg-white/10 text-indigo-200 hover:bg-white/20 hover:text-white'
+                }`}
+              title={isEditMode ? "Done Editing" : "Edit Plan"}
+            >
+              {isEditMode ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+            </button>
 
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
 
-        <div className="z-10 text-center md:text-left">
-          <h3 className="text-indigo-200 text-sm font-medium uppercase tracking-wider mb-1">Total Annual Budget</h3>
-          <p className="text-3xl md:text-4xl font-extrabold tracking-tight">{formatCurrency(grandTotal)}</p>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 z-10 w-full md:w-auto">
-          <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
-            <p className="text-indigo-200 text-xs mb-1">Annualized Monthly</p>
-            <p className="font-bold text-lg">{formatCurrency(totalMonthly * 12)}</p>
-            <p className="text-[10px] text-indigo-300">({formatCurrency(totalMonthly)} / mo)</p>
-          </div>
-          <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
-            <p className="text-indigo-200 text-xs mb-1">Annual Events</p>
-            <p className="font-bold text-lg">{formatCurrency(totalYearly)}</p>
-            <p className="text-[10px] text-indigo-300">(One-off / Yearly items)</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Add Item Button - ONLY visible in Edit Mode */}
-      {isEditMode && (
-        <button
-          onClick={() => handleOpenModal()}
-          className="w-full py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50 transition-colors animate-in fade-in zoom-in"
-        >
-          <Plus className="w-6 h-6" />
-          Add New Budget Item
-        </button>
-      )}
-
-      <RenderSection title="Monthly Recurring" items={monthlyItems} type="monthly" />
-      <RenderSection title="Annual Events" items={yearlyItems} type="yearly" />
-
-      {/* Edit/Add Modal */}
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center"
-          // We set the height of the container to match the Visual Viewport.
-          // This ensures that when the keyboard opens (shrinking the visual viewport), 
-          // the flex items-center logic recenters the modal in the *remaining* space (above keyboard).
-          style={{ height: viewportHeight, top: 0 }}
-        >
-          {/* Backdrop - fixed to screen to cover everything even if viewport shrinks */}
-          <div
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
-            onClick={() => setIsModalOpen(false)}
-          />
-
-          {/* Modal Content - Animated and Centered in the dynamic viewport */}
-          <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[90%] relative z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
-          >
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
-              <h3 className="text-lg font-bold text-gray-800">
-                {editingIndex !== null ? 'Edit Budget Item' : 'New Budget Item'}
-              </h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
-              </button>
+            <div className="z-10 text-center md:text-left">
+              <h3 className="text-indigo-200 text-sm font-medium uppercase tracking-wider mb-1">Total Annual Budget</h3>
+              <p className="text-3xl md:text-4xl font-extrabold tracking-tight">{formatCurrency(grandTotal)}</p>
             </div>
 
-            <div className="p-6 space-y-4 overflow-y-auto">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g. Internet Bill"
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3"
-                  autoFocus
-                />
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 z-10 w-full md:w-auto">
+              <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
+                <p className="text-indigo-200 text-xs mb-1">Annualized Monthly</p>
+                <p className="font-bold text-lg">{formatCurrency(totalMonthly * 12)}</p>
+                <p className="text-[10px] text-indigo-300">({formatCurrency(totalMonthly)} / mo)</p>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as BudgetCategory }))}
-                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
-                >
-                  {Object.values(BudgetCategory).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
+              <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
+                <p className="text-indigo-200 text-xs mb-1">Annual Events</p>
+                <p className="font-bold text-lg">{formatCurrency(totalYearly)}</p>
+                <p className="text-[10px] text-indigo-300">(One-off / Yearly items)</p>
               </div>
+            </div>
+          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-500 font-bold text-sm">Rp</span>
+          {/* Add Item Button - ONLY visible in Edit Mode */}
+          {isEditMode && (
+            <button
+              onClick={() => handleOpenModal()}
+              className="w-full py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50 transition-colors animate-in fade-in zoom-in"
+            >
+              <Plus className="w-6 h-6" />
+              Add New Budget Item
+            </button>
+          )}
+
+          <RenderSection title="Monthly Recurring" items={monthlyItems} type="monthly" />
+          <RenderSection title="Annual Events" items={yearlyItems} type="yearly" />
+
+          {/* Edit/Add Modal */}
+          {isModalOpen && (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center"
+              // We set the height of the container to match the Visual Viewport.
+              // This ensures that when the keyboard opens (shrinking the visual viewport), 
+              // the flex items-center logic recenters the modal in the *remaining* space (above keyboard).
+              style={{ height: viewportHeight, top: 0 }}
+            >
+              {/* Backdrop - fixed to screen to cover everything even if viewport shrinks */}
+              <div
+                className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity"
+                onClick={() => setIsModalOpen(false)}
+              />
+
+              {/* Modal Content - Animated and Centered in the dynamic viewport */}
+              <div
+                className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden flex flex-col max-h-[90%] relative z-10 transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
+              >
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
+                  <h3 className="text-lg font-bold text-gray-800">
+                    {editingIndex !== null ? 'Edit Budget Item' : 'New Budget Item'}
+                  </h3>
+                  <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="p-6 space-y-4 overflow-y-auto">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
                     <input
-                      type="number"
-                      value={formData.amount}
-                      onChange={(e) => setFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
-                      className="pl-9 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3"
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g. Internet Bill"
+                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3"
+                      autoFocus
                     />
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
-                  <select
-                    value={formData.frequency}
-                    onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value as 'Monthly' | 'Yearly' }))}
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select
+                      value={formData.category}
+                      onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as BudgetCategory }))}
+                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
+                    >
+                      {Object.values(BudgetCategory).map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-gray-500 font-bold text-sm">Rp</span>
+                        <input
+                          type="number"
+                          value={formData.amount}
+                          onChange={(e) => setFormData(prev => ({ ...prev, amount: Number(e.target.value) }))}
+                          className="pl-9 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+                      <select
+                        value={formData.frequency}
+                        onChange={(e) => setFormData(prev => ({ ...prev, frequency: e.target.value as 'Monthly' | 'Yearly' }))}
+                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
+                      >
+                        <option value="Monthly">Monthly</option>
+                        <option value="Yearly">Yearly</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSave}
+                    className="w-full mt-4 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center gap-2"
                   >
-                    <option value="Monthly">Monthly</option>
-                    <option value="Yearly">Yearly</option>
-                  </select>
+                    <Save className="w-5 h-5" />
+                    Save Item
+                  </button>
                 </div>
               </div>
-
-              <button
-                onClick={handleSave}
-                className="w-full mt-4 bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 flex items-center justify-center gap-2"
-              >
-                <Save className="w-5 h-5" />
-                Save Item
-              </button>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 };
