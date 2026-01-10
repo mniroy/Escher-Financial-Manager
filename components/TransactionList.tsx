@@ -163,10 +163,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex-shrink-0">
                 {/* Header Row - Compact */}
                 <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-baseline gap-2">
-                        <h2 className="text-sm font-semibold text-gray-800">Transactions</h2>
-                        <span className="text-[10px] text-gray-400">{filteredExpenses.length} items</span>
-                    </div>
+                    <h2 className="text-sm font-semibold text-gray-800">Transactions</h2>
                     <div className="flex items-center gap-1">
                         {/* Chart Toggle */}
                         <button
@@ -196,7 +193,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 {/* Total Display - Compact */}
                 <div className="flex items-baseline gap-2 mb-2">
                     <p className="text-xl font-bold text-gray-900">{formatCurrency(chartTotal)}</p>
-                    <p className="text-[10px] text-gray-400">Avg: {formatCurrency(chartAvg)}/day</p>
+                    <p className="text-[10px] text-gray-400">{filteredExpenses.length} items • Avg: {formatCurrency(chartAvg)}/day</p>
                 </div>
 
                 {/* Range Selector */}
