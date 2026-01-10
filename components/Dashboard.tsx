@@ -2,8 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
-import { exportToCSV } from '../services/storageService';
-import { Download, Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, AlertTriangle } from 'lucide-react';
+import { Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard } from 'lucide-react';
 import ExpenseLogger from './ExpenseLogger';
 
 interface DashboardProps {
@@ -140,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const totalRemaining = totalBudget - totalSpent;
 
   return (
-    <div className="space-y-3 p-3">
+    <div className="flex flex-col gap-3 p-3 h-full overflow-hidden overscroll-none">
 
       {/* Mode Selector - Compact */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
@@ -248,7 +247,27 @@ const Dashboard: React.FC<DashboardProps> = ({
         </button>
       )}
 
-      {/* View Controls - Compact Single Row */}
+      {/* Stats Cards - Fixed Layout */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
+        <div className="grid grid-cols-3 divide-x divide-gray-100">
+          <div className="text-center px-2">
+            <p className="text-[10px] text-gray-400 uppercase">Budget</p>
+            <p className="text-sm sm:text-lg font-bold text-emerald-600">{formatCurrency(totalBudget)}</p>
+          </div>
+          <div className="text-center px-2">
+            <p className="text-[10px] text-gray-400 uppercase">Spent</p>
+            <p className="text-sm sm:text-lg font-bold text-gray-900">{formatCurrency(totalSpent)}</p>
+          </div>
+          <div className="text-center px-2">
+            <p className="text-[10px] text-gray-400 uppercase">Left</p>
+            <p className={`text-sm sm:text-lg font-bold ${totalRemaining < 0 ? 'text-red-600' : 'text-gray-800'}`}>
+              {formatCurrency(totalRemaining)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* View Controls - Below Stats */}
       <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between gap-2">
         {/* Date Navigation */}
         <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
@@ -292,37 +311,10 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Stats Cards - Compact Horizontal */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
-        <div className="flex items-center justify-between divide-x divide-gray-100">
-          <div className="flex-1 text-center px-2">
-            <p className="text-[10px] text-gray-400 uppercase">Budget</p>
-            <p className="text-sm sm:text-lg font-bold text-emerald-600">{formatCurrency(totalBudget)}</p>
-          </div>
-          <div className="flex-1 text-center px-2">
-            <p className="text-[10px] text-gray-400 uppercase">Spent</p>
-            <p className="text-sm sm:text-lg font-bold text-gray-900">{formatCurrency(totalSpent)}</p>
-          </div>
-          <div className="flex-1 text-center px-2">
-            <p className="text-[10px] text-gray-400 uppercase">Left</p>
-            <p className={`text-sm sm:text-lg font-bold ${totalRemaining < 0 ? 'text-red-600' : 'text-gray-800'}`}>
-              {formatCurrency(totalRemaining)}
-            </p>
-          </div>
-          <button
-            onClick={exportToCSV}
-            className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg ml-2"
-            title="Export CSV"
-          >
-            <Download className="w-4 h-4 text-gray-600" />
-          </button>
-        </div>
-      </div>
-
       {/* Main Chart - Compact */}
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex-1 min-h-0">
         <h3 className="text-sm font-semibold text-gray-700 mb-2">Spending vs Budget</h3>
-        <div className="h-[250px] sm:h-[350px] w-full">
+        <div className="h-[200px] sm:h-[280px] w-full">
           {chartData.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart

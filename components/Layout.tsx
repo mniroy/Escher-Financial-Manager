@@ -219,7 +219,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
       <main
         ref={contentRef}
-        className="flex-grow flex flex-col w-full max-w-5xl mx-auto transition-transform duration-200 ease-out h-full"
+        className="flex-1 flex flex-col w-full max-w-5xl mx-auto transition-transform duration-200 ease-out overflow-hidden"
         style={{ transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : 'none' }}
       >
         {children}
