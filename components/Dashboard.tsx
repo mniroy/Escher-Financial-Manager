@@ -25,7 +25,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   activePlan,
   onModeChange
 }) => {
-  const [viewMode, setViewMode] = useState<'monthly' | 'yearly'>('monthly');
+  const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showLogger, setShowLogger] = useState(false);
 
@@ -70,20 +70,33 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (viewMode === 'monthly') {
       return selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     }
+    if (viewMode === 'yearly-only') {
+      return `Yearly Events ${displayedYear}`;
+    }
     return `Year ${displayedYear}`;
   }, [viewMode, selectedDate, displayedYear]);
+
+  // Get yearly budget item names for filtering yearly-only expenses
+  const yearlyBudgetItemNames = useMemo(() => {
+    return new Set(budgetItems.filter(item => item.frequency === 'Yearly').map(item => item.name));
+  }, [budgetItems]);
 
   // Filter expenses
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => {
       const d = new Date(e.date);
+      const yearMatch = d.getFullYear() === displayedYear;
+
       if (viewMode === 'monthly') {
-        return d.getMonth() === displayedMonth && d.getFullYear() === displayedYear;
+        return d.getMonth() === displayedMonth && yearMatch;
+      } else if (viewMode === 'yearly-only') {
+        // Only include expenses tied to yearly budget items
+        return yearMatch && e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
       } else {
-        return d.getFullYear() === displayedYear;
+        return yearMatch;
       }
     });
-  }, [expenses, viewMode, displayedMonth, displayedYear]);
+  }, [expenses, viewMode, displayedMonth, displayedYear, yearlyBudgetItemNames]);
 
   // Calculate Chart Data based on view mode and current budgetItems
   const chartData = useMemo(() => {
@@ -96,6 +109,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (viewMode === 'monthly') {
         // In monthly mode, we only care about monthly allocations
         budget = row.monthlyAllocation;
+        spent = filteredExpenses
+          .filter(e => e.category === row.category)
+          .reduce((sum, e) => sum + e.amount, 0);
+      } else if (viewMode === 'yearly-only') {
+        // In yearly-only mode, show only yearly allocations (one-time annual expenses)
+        budget = row.yearlyAllocation;
         spent = filteredExpenses
           .filter(e => e.category === row.category)
           .reduce((sum, e) => sum + e.amount, 0);
@@ -291,7 +310,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="w-full md:w-auto bg-gray-100 p-1 rounded-lg flex shadow-inner">
           <button
             onClick={() => setViewMode('monthly')}
-            className={`flex-1 md:flex-none justify-center px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'monthly'
+            className={`flex-1 md:flex-none justify-center px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1.5 transition-all ${viewMode === 'monthly'
               ? 'bg-white text-indigo-700 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -300,14 +319,24 @@ const Dashboard: React.FC<DashboardProps> = ({
             Monthly
           </button>
           <button
+            onClick={() => setViewMode('yearly-only')}
+            className={`flex-1 md:flex-none justify-center px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1.5 transition-all ${viewMode === 'yearly-only'
+              ? 'bg-white text-purple-700 shadow-sm'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            <Plane className="w-4 h-4" />
+            Yearly Events
+          </button>
+          <button
             onClick={() => setViewMode('yearly')}
-            className={`flex-1 md:flex-none justify-center px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'yearly'
+            className={`flex-1 md:flex-none justify-center px-3 py-2 rounded-md text-sm font-medium flex items-center gap-1.5 transition-all ${viewMode === 'yearly'
               ? 'bg-white text-indigo-700 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             <TrendingUp className="w-4 h-4" />
-            Yearly
+            Year Total
           </button>
         </div>
       </div>
@@ -315,11 +344,15 @@ const Dashboard: React.FC<DashboardProps> = ({
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-row md:flex-col justify-between items-center md:items-start">
-          <p className="text-sm text-gray-500 font-medium">{viewMode === 'monthly' ? 'Budget' : 'Annual Budget'}</p>
+          <p className="text-sm text-gray-500 font-medium">
+            {viewMode === 'monthly' ? 'Monthly Budget' : viewMode === 'yearly-only' ? 'Yearly Events Budget' : 'Annual Budget'}
+          </p>
           <h3 className="text-xl md:text-2xl font-bold text-emerald-600">{formatCurrency(totalBudget)}</h3>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-row md:flex-col justify-between items-center md:items-start">
-          <p className="text-sm text-gray-500 font-medium">Spent</p>
+          <p className="text-sm text-gray-500 font-medium">
+            {viewMode === 'yearly-only' ? 'Yearly Events Spent' : 'Spent'}
+          </p>
           <h3 className="text-xl md:text-2xl font-bold text-gray-900">
             {formatCurrency(totalSpent)}
           </h3>
