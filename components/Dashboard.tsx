@@ -317,65 +317,66 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* This Month's Stats - Colorful Grid */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <TrendingUp className="w-5 h-5 text-emerald-500" />
-          <h3 className="text-base font-bold text-gray-800">This Month's Stats</h3>
+      {/* This Month's Stats - Colorful Grid */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <TrendingUp className="w-4 h-4 text-emerald-500" />
+          <h3 className="text-sm font-bold text-gray-800">This Month's Stats</h3>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2">
           {/* Total Receipts */}
-          <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
-            <div className="flex items-center gap-2 mb-1">
-              <Receipt className="w-4 h-4 text-emerald-600" />
-              <span className="text-xs font-medium text-emerald-700">Total Receipts</span>
+          <div className="bg-emerald-50/50 rounded-lg p-2 border border-emerald-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Receipt className="w-3 h-3 text-emerald-600" />
+              <span className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">Receipts</span>
             </div>
-            <p className="text-2xl font-bold text-emerald-600">{monthlyStats.totalReceipts}</p>
+            <p className="text-lg font-bold text-emerald-700">{monthlyStats.totalReceipts}</p>
           </div>
 
           {/* Total Spent */}
-          <div className="bg-cyan-50 rounded-xl p-3 border border-cyan-100">
-            <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="w-4 h-4 text-cyan-600" />
-              <span className="text-xs font-medium text-cyan-700">Total Spent</span>
+          <div className="bg-cyan-50/50 rounded-lg p-2 border border-cyan-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <DollarSign className="w-3 h-3 text-cyan-600" />
+              <span className="text-[10px] font-semibold text-cyan-700 uppercase tracking-wide">Spent</span>
             </div>
-            <p className="text-2xl font-bold text-cyan-600">{formatCurrency(monthlyStats.totalSpentThisMonth)}</p>
+            <p className="text-sm font-bold text-cyan-700">{formatCurrency(monthlyStats.totalSpentThisMonth)}</p>
           </div>
 
           {/* Avg Daily Spend */}
-          <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
-            <div className="flex items-center gap-2 mb-1">
-              <CalendarDays className="w-4 h-4 text-amber-600" />
-              <span className="text-xs font-medium text-amber-700">Avg. Daily Spend</span>
+          <div className="bg-amber-50/50 rounded-lg p-2 border border-amber-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <CalendarDays className="w-3 h-3 text-amber-600" />
+              <span className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">Daily Avg</span>
             </div>
-            <p className="text-2xl font-bold text-amber-600">{formatCurrency(monthlyStats.avgDailySpend)}</p>
+            <p className="text-sm font-bold text-amber-700">{formatCurrency(monthlyStats.avgDailySpend)}</p>
           </div>
 
           {/* Avg Monthly Spend */}
-          <div className="bg-pink-50 rounded-xl p-3 border border-pink-100">
-            <div className="flex items-center gap-2 mb-1">
-              <BarChart3 className="w-4 h-4 text-pink-600" />
-              <span className="text-xs font-medium text-pink-700">Avg. Monthly Spend</span>
+          <div className="bg-pink-50/50 rounded-lg p-2 border border-pink-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <BarChart3 className="w-3 h-3 text-pink-600" />
+              <span className="text-[10px] font-semibold text-pink-700 uppercase tracking-wide">Monthly Avg</span>
             </div>
-            <p className="text-2xl font-bold text-purple-600">{formatCurrency(monthlyStats.avgMonthlySpend)}</p>
+            <p className="text-sm font-bold text-purple-700">{formatCurrency(monthlyStats.avgMonthlySpend)}</p>
           </div>
 
           {/* Top Category */}
-          <div className="bg-yellow-50 rounded-xl p-3 border border-yellow-100">
-            <div className="flex items-center gap-2 mb-1">
-              <Tag className="w-4 h-4 text-yellow-600" />
-              <span className="text-xs font-medium text-yellow-700">Top Category</span>
+          <div className="bg-yellow-50/50 rounded-lg p-2 border border-yellow-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <Tag className="w-3 h-3 text-yellow-600" />
+              <span className="text-[10px] font-semibold text-yellow-700 uppercase tracking-wide">Top Category</span>
             </div>
-            <p className="text-lg font-bold text-emerald-600 truncate">{monthlyStats.topCategoryName}</p>
+            <p className="text-sm font-bold text-emerald-700 truncate">{monthlyStats.topCategoryName}</p>
           </div>
 
           {/* Top Category % */}
-          <div className="bg-orange-50 rounded-xl p-3 border border-orange-100">
-            <div className="flex items-center gap-2 mb-1">
-              <PieChart className="w-4 h-4 text-orange-600" />
-              <span className="text-xs font-medium text-orange-700">Top Cat. %</span>
+          <div className="bg-orange-50/50 rounded-lg p-2 border border-orange-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <PieChart className="w-3 h-3 text-orange-600" />
+              <span className="text-[10px] font-semibold text-orange-700 uppercase tracking-wide">Top Cat. %</span>
             </div>
-            <p className="text-2xl font-bold text-orange-600">{monthlyStats.topCategoryPercent.toFixed(1)}%</p>
+            <p className="text-lg font-bold text-orange-700">{monthlyStats.topCategoryPercent.toFixed(1)}%</p>
           </div>
         </div>
       </div>
