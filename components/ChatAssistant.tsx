@@ -30,35 +30,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     { id: 'init', role: 'model', text: "Hi! I'm Papion, your financial assistant. I can log expenses for you, or answer questions about your spending and budget. Try asking 'How much have I spent on Food?' or 'Log a taxi ride for 50k'." }
   ]);
   const [isTyping, setIsTyping] = useState(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<any>(null);
-
-  // Keyboard visibility detection using VisualViewport API
-  useEffect(() => {
-    const handleViewportChange = () => {
-      if (window.visualViewport) {
-        const viewportHeight = window.visualViewport.height;
-        const windowHeight = window.innerHeight;
-        const keyboardOffset = windowHeight - viewportHeight;
-
-        // Only set keyboard height if it's significant (> 100px, to avoid false positives)
-        setKeyboardHeight(keyboardOffset > 100 ? keyboardOffset : 0);
-      }
-    };
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportChange);
-      window.visualViewport.addEventListener('scroll', handleViewportChange);
-    }
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportChange);
-        window.visualViewport.removeEventListener('scroll', handleViewportChange);
-      }
-    };
-  }, []);
 
   const activePlan = budgetItems.find(i => i.name === activePlanName);
 
@@ -386,11 +359,8 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Fixed at bottom, moves up with keyboard */}
-      <div
-        className="absolute left-0 right-0 p-3 bg-white border-t border-gray-200 transition-all duration-150"
-        style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 0 }}
-      >
+      {/* Input Area - Fixed at bottom */}
+      <div className="absolute left-0 right-0 bottom-0 p-3 bg-white border-t border-gray-200">
         <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-2 border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
           <input
             type="text"
