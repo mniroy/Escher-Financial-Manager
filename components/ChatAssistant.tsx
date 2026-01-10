@@ -30,8 +30,34 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     { id: 'init', role: 'model', text: "Hi! I'm Papion, your financial assistant. I can log expenses for you, or answer questions about your spending and budget. Try asking 'How much have I spent on Food?' or 'Log a taxi ride for 50k'." }
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<any>(null);
+  const inputAreaRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard visibility detection using VisualViewport API
+  useEffect(() => {
+    const handleViewportResize = () => {
+      if (window.visualViewport) {
+        const viewportHeight = window.visualViewport.height;
+        const windowHeight = window.innerHeight;
+        const offset = windowHeight - viewportHeight;
+        setKeyboardOffset(offset > 0 ? offset : 0);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      window.visualViewport.addEventListener('scroll', handleViewportResize);
+    }
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+        window.visualViewport.removeEventListener('scroll', handleViewportResize);
+      }
+    };
+  }, []);
 
   const activePlan = budgetItems.find(i => i.name === activePlanName);
 
@@ -360,7 +386,11 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
       </div>
 
       {/* Input Area */}
-      <div className="p-3 bg-white border-t border-gray-200">
+      <div
+        ref={inputAreaRef}
+        className="p-3 bg-white border-t border-gray-200 transition-transform duration-150"
+        style={{ transform: `translateY(-${keyboardOffset}px)` }}
+      >
         <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-2 border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
           <input
             type="text"
