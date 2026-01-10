@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { Expense, BudgetCategory } from '../types';
 import { formatCurrency } from '../constants';
-import { Calendar, TrendingUp, ArrowUpDown, Pencil, Trash2, X, Save, ChevronLeft, ChevronRight, Plane, Check, Sun, BarChart3 } from 'lucide-react';
+import { ArrowUpDown, Pencil, Trash2, X, Save, Check, BarChart3, Calendar, Plane } from 'lucide-react';
 
 interface TransactionListProps {
     expenses: Expense[];
@@ -15,73 +15,38 @@ const TransactionList: React.FC<TransactionListProps> = ({
     onEditExpense,
     onDeleteExpense,
 }) => {
-    const [viewMode, setViewMode] = useState<'daily' | 'monthly' | 'annual'>('monthly');
-    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [selectedDate] = useState(new Date());
     const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [chartRange, setChartRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('1W');
+    const [chartRange, setChartRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('1M');
     const [showChart, setShowChart] = useState(true);
 
-    const displayedDay = selectedDate.getDate();
-    const displayedMonth = selectedDate.getMonth();
-    const displayedYear = selectedDate.getFullYear();
-
-    // Navigation handlers
-    const handlePrev = () => {
-        setSelectedDate(prev => {
-            const d = new Date(prev);
-            if (viewMode === 'daily') {
-                d.setDate(d.getDate() - 1);
-            } else if (viewMode === 'monthly') {
-                d.setMonth(d.getMonth() - 1);
-            } else {
-                d.setFullYear(d.getFullYear() - 1);
-            }
-            return d;
-        });
+    // Get days for range
+    const getRangeDays = (range: typeof chartRange) => {
+        switch (range) {
+            case '1D': return 1;
+            case '1W': return 7;
+            case '1M': return 30;
+            case '3M': return 90;
+            case '1Y': return 365;
+            case 'ALL': return 9999;
+        }
     };
 
-    const handleNext = () => {
-        setSelectedDate(prev => {
-            const d = new Date(prev);
-            if (viewMode === 'daily') {
-                d.setDate(d.getDate() + 1);
-            } else if (viewMode === 'monthly') {
-                d.setMonth(d.getMonth() + 1);
-            } else {
-                d.setFullYear(d.getFullYear() + 1);
-            }
-            return d;
-        });
-    };
-
-    const dateLabel = useMemo(() => {
-        if (viewMode === 'daily') {
-            return selectedDate.toLocaleDateString('default', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-        }
-        if (viewMode === 'monthly') {
-            return selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
-        }
-        return `Year ${displayedYear}`;
-    }, [viewMode, selectedDate, displayedYear]);
-
-    // Filter expenses
+    // Filter expenses based on chartRange
     const filteredExpenses = useMemo(() => {
+        const today = selectedDate;
+        const days = getRangeDays(chartRange);
+
         return expenses.filter(e => {
             const d = new Date(e.date);
-            const yearMatch = d.getFullYear() === displayedYear;
-
-            if (viewMode === 'daily') {
-                return d.getDate() === displayedDay && d.getMonth() === displayedMonth && yearMatch;
-            } else if (viewMode === 'monthly') {
-                return d.getMonth() === displayedMonth && yearMatch;
-            } else {
-                return yearMatch;
-            }
+            const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+            if (chartRange === 'ALL') return true;
+            return diffDays >= 0 && diffDays < days;
         });
-    }, [expenses, viewMode, displayedDay, displayedMonth, displayedYear]);
+    }, [expenses, chartRange, selectedDate]);
 
     // Sort expenses
     const sortedExpenses = useMemo(() => {
@@ -94,13 +59,6 @@ const TransactionList: React.FC<TransactionListProps> = ({
     }, [filteredExpenses, sortBy]);
 
     const totalSpent = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-    // Calculate daily average for monthly view
-    const dailyAverage = useMemo(() => {
-        if (viewMode !== 'monthly' || filteredExpenses.length === 0) return 0;
-        const uniqueDays = new Set(filteredExpenses.map(e => e.date)).size;
-        return uniqueDays > 0 ? totalSpent / uniqueDays : 0;
-    }, [viewMode, filteredExpenses, totalSpent]);
 
     // Chart data - spending based on range
     const chartData = useMemo(() => {
@@ -201,26 +159,15 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
     return (
         <div className="flex flex-col gap-3 p-3 h-full overflow-hidden">
-            {/* Compact Header with Stats */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex-shrink-0">
-                <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3">
-                        <div>
-                            <h2 className="text-lg font-bold text-gray-900">Transactions</h2>
-                            <p className="text-xs text-gray-500">{filteredExpenses.length} items</p>
-                        </div>
+            {/* Chart Section with Integrated Header */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex-shrink-0">
+                {/* Header Row */}
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900">Transactions</h2>
+                        <p className="text-xs text-gray-500">{filteredExpenses.length} items</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        {viewMode === 'monthly' && dailyAverage > 0 && (
-                            <div className="text-right hidden sm:block">
-                                <p className="text-[10px] text-gray-400 uppercase">Daily Avg</p>
-                                <p className="text-sm font-semibold text-gray-600">{formatCurrency(dailyAverage)}</p>
-                            </div>
-                        )}
-                        <div className="text-right">
-                            <p className="text-[10px] text-gray-400 uppercase">Total</p>
-                            <p className="text-lg font-bold text-gray-900">{formatCurrency(totalSpent)}</p>
-                        </div>
                         {/* Chart Toggle */}
                         <button
                             onClick={() => setShowChart(!showChart)}
@@ -245,33 +192,31 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         </button>
                     </div>
                 </div>
-            </div>
 
-            {showChart && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex-shrink-0">
-                    {/* Total Display */}
-                    <div className="mb-2">
-                        <p className="text-2xl font-bold text-gray-900">{formatCurrency(chartTotal)}</p>
-                        <p className="text-xs text-gray-400">Avg: {formatCurrency(chartAvg)}/day</p>
-                    </div>
+                {/* Total Display */}
+                <div className="mb-2">
+                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(chartTotal)}</p>
+                    <p className="text-xs text-gray-400">Avg: {formatCurrency(chartAvg)}/day</p>
+                </div>
 
-                    {/* Range Selector - Like stock chart */}
-                    <div className="flex justify-around mb-3 border-b border-gray-100 pb-2">
-                        {(['1D', '1W', '1M', '3M', '1Y', 'ALL'] as const).map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => setChartRange(range)}
-                                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${chartRange === range
-                                        ? 'bg-gray-100 text-gray-900 border border-gray-300'
-                                        : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                            >
-                                {range}
-                            </button>
-                        ))}
-                    </div>
+                {/* Range Selector */}
+                <div className="flex justify-around mb-3 border-b border-gray-100 pb-2">
+                    {(['1D', '1W', '1M', '3M', '1Y', 'ALL'] as const).map((range) => (
+                        <button
+                            key={range}
+                            onClick={() => setChartRange(range)}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${chartRange === range
+                                ? 'bg-gray-100 text-gray-900 border border-gray-300'
+                                : 'text-gray-500 hover:text-gray-700'
+                                }`}
+                        >
+                            {range}
+                        </button>
+                    ))}
+                </div>
 
-                    {/* Chart */}
+                {/* Chart */}
+                {showChart && (
                     <div className="h-28">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
@@ -309,81 +254,32 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
 
-            {/* Controls - More Compact */}
-            <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
-                {/* Date Navigation */}
-                <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
-                    <button onClick={handlePrev} className="p-1.5 hover:bg-gray-200 rounded-l-md transition-colors">
-                        <ChevronLeft className="w-4 h-4 text-gray-600" />
+            {/* Sort Controls Only */}
+            <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
+                <span className="text-xs text-gray-500 font-medium">Sort by:</span>
+                <div className="bg-gray-100 p-0.5 rounded-lg flex shadow-inner">
+                    <button
+                        onClick={() => setSortBy('date')}
+                        className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${sortBy === 'date'
+                            ? 'bg-white text-gray-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        <ArrowUpDown className="w-3 h-3" />
+                        Date
                     </button>
-                    <div className="px-2 py-1 min-w-[100px] sm:min-w-[140px] text-center font-medium text-gray-800 text-xs sm:text-sm">
-                        {dateLabel}
-                    </div>
-                    <button onClick={handleNext} className="p-1.5 hover:bg-gray-200 rounded-r-md transition-colors">
-                        <ChevronRight className="w-4 h-4 text-gray-600" />
+                    <button
+                        onClick={() => setSortBy('category')}
+                        className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${sortBy === 'category'
+                            ? 'bg-white text-gray-700 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                    >
+                        Category
                     </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                    {/* View Toggle - Compact */}
-                    <div className="bg-gray-100 p-0.5 rounded-lg flex shadow-inner flex-1 sm:flex-none">
-                        <button
-                            onClick={() => setViewMode('daily')}
-                            className={`flex-1 sm:flex-none px-2 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-1 transition-all ${viewMode === 'daily'
-                                ? 'bg-white text-orange-600 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            <Sun className="w-3 h-3" />
-                            <span className="hidden sm:inline">Daily</span>
-                        </button>
-                        <button
-                            onClick={() => setViewMode('monthly')}
-                            className={`flex-1 sm:flex-none px-2 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-1 transition-all ${viewMode === 'monthly'
-                                ? 'bg-white text-indigo-700 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            <Calendar className="w-3 h-3" />
-                            <span className="hidden sm:inline">Monthly</span>
-                        </button>
-                        <button
-                            onClick={() => setViewMode('annual')}
-                            className={`flex-1 sm:flex-none px-2 py-1.5 rounded-md text-xs font-medium flex items-center justify-center gap-1 transition-all ${viewMode === 'annual'
-                                ? 'bg-white text-indigo-700 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            <TrendingUp className="w-3 h-3" />
-                            <span className="hidden sm:inline">Annual</span>
-                        </button>
-                    </div>
-
-                    {/* Sort Toggle */}
-                    <div className="bg-gray-100 p-0.5 rounded-lg flex shadow-inner">
-                        <button
-                            onClick={() => setSortBy('date')}
-                            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${sortBy === 'date'
-                                ? 'bg-white text-gray-700 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            <ArrowUpDown className="w-3 h-3" />
-                            Date
-                        </button>
-                        <button
-                            onClick={() => setSortBy('category')}
-                            className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${sortBy === 'category'
-                                ? 'bg-white text-gray-700 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            Category
-                        </button>
-                    </div>
                 </div>
             </div>
 
@@ -393,7 +289,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     <div className="p-8 text-center text-gray-500">
                         <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-300" />
                         <p className="font-medium text-sm">No transactions</p>
-                        <p className="text-xs mt-1">{dateLabel}</p>
+                        <p className="text-xs mt-1">for selected period</p>
                     </div>
                 ) : (
                     <>
