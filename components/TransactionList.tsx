@@ -158,45 +158,45 @@ const TransactionList: React.FC<TransactionListProps> = ({
     };
 
     return (
-        <div className="flex flex-col gap-3 p-3 h-full overflow-hidden">
+        <div className="flex flex-col gap-2 p-3 h-full overflow-hidden">
             {/* Chart Section with Integrated Header */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex-shrink-0">
-                {/* Header Row */}
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <h2 className="text-lg font-bold text-gray-900">Transactions</h2>
-                        <p className="text-xs text-gray-500">{filteredExpenses.length} items</p>
+                {/* Header Row - Compact */}
+                <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-baseline gap-2">
+                        <h2 className="text-sm font-semibold text-gray-800">Transactions</h2>
+                        <span className="text-[10px] text-gray-400">{filteredExpenses.length} items</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                         {/* Chart Toggle */}
                         <button
                             onClick={() => setShowChart(!showChart)}
-                            className={`p-2 rounded-full transition-all ${showChart
-                                ? 'bg-indigo-500 text-white shadow-lg'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                            className={`p-1.5 rounded-lg transition-all ${showChart
+                                ? 'bg-indigo-500 text-white'
+                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                 }`}
                             title={showChart ? "Hide Chart" : "Show Chart"}
                         >
-                            <BarChart3 className="w-4 h-4" />
+                            <BarChart3 className="w-3.5 h-3.5" />
                         </button>
                         {/* Edit Toggle */}
                         <button
                             onClick={() => setIsEditMode(!isEditMode)}
-                            className={`p-2 rounded-full transition-all ${isEditMode
-                                ? 'bg-emerald-500 text-white shadow-lg'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200 hover:text-gray-600'
+                            className={`p-1.5 rounded-lg transition-all ${isEditMode
+                                ? 'bg-emerald-500 text-white'
+                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                 }`}
                             title={isEditMode ? "Done Editing" : "Edit Mode"}
                         >
-                            {isEditMode ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+                            {isEditMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
                         </button>
                     </div>
                 </div>
 
-                {/* Total Display */}
-                <div className="mb-2">
-                    <p className="text-2xl font-bold text-gray-900">{formatCurrency(chartTotal)}</p>
-                    <p className="text-xs text-gray-400">Avg: {formatCurrency(chartAvg)}/day</p>
+                {/* Total Display - Compact */}
+                <div className="flex items-baseline gap-2 mb-2">
+                    <p className="text-xl font-bold text-gray-900">{formatCurrency(chartTotal)}</p>
+                    <p className="text-[10px] text-gray-400">Avg: {formatCurrency(chartAvg)}/day</p>
                 </div>
 
                 {/* Range Selector */}
