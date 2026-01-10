@@ -1,203 +1,230 @@
 # N8n Workflow Setup for Receipt Processing
 
-This guide explains how to set up an n8n workflow to automatically process WhatsApp receipts and log expenses to Google Sheets.
+This guide explains how to set up an n8n workflow to process WhatsApp receipts using n8n's native Google Drive and Google Sheets nodes.
 
 ## Architecture Overview
 
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────────┐    ┌──────────────┐
-│  WhatsApp       │──▶ │  Get OAuth       │──▶ │  HTTP Request           │──▶ │  Response    │
-│  Trigger        │    │  Token (Code)    │    │  (Call Vercel API)      │    │              │
-└─────────────────┘    └──────────────────┘    └─────────────────────────┘    └──────────────┘
+┌─────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌──────────────┐    ┌──────────────┐
+│  WhatsApp   │──▶ │  HTTP Request   │──▶ │  Google Drive   │──▶ │  Google      │──▶ │  Response    │
+│  Trigger    │    │  (Gemini API)   │    │  (Upload)       │    │  Sheets      │    │              │
+└─────────────┘    └─────────────────┘    └─────────────────┘    └──────────────┘    └──────────────┘
 ```
-
-**How it works:**
-- n8n extracts a fresh OAuth token from its credentials
-- The Vercel API receives the token and handles all Google operations
-- No complex folder creation nodes needed in n8n!
 
 ---
 
 ## Prerequisites
 
-1. **n8n instance** (self-hosted or cloud)
-2. **Google Cloud Console project** with:
-   - Google Drive API enabled
-   - Google Sheets API enabled
-   - OAuth 2.0 credentials configured
-3. **Deployed Vercel app** with:
-   - `RECEIPT_API_KEY` environment variable set
-   - `API_KEY` (Gemini API key) environment variable set
+1. **n8n instance** with Google OAuth credentials configured
+2. **Vercel app** deployed with `RECEIPT_API_KEY` and `API_KEY` (Gemini) set
+3. **Google Drive folder** manually created:
+   - Create: `Escher Finance Manager / 2026 / January` (and other months as needed)
+4. **Google Sheet** with an "Expenses" sheet
 
 ---
 
-## Step 1: Create Google OAuth Credential in n8n
+## Step 1: Create Google OAuth Credentials
 
 1. Go to **Settings → Credentials → Add Credential**
-2. Search for **Google Drive OAuth2 API**
-3. Click **Create New**
-4. Follow the OAuth flow:
-   - Sign in with your Google account
-   - Grant permissions for Google Drive and Google Sheets
-5. Name the credential exactly: `Google Drive account`
-
-> **Important:** Remember the credential name - you'll need it in the Code node.
+2. Add **Google Drive OAuth2 API** credential
+3. Add **Google Sheets OAuth2 API** credential
+4. Sign in and grant permissions for each
 
 ---
 
 ## Step 2: Create the Workflow
 
-### Node 1: WhatsApp Trigger (or Webhook)
+### Node 1: Webhook (Trigger)
 
 1. Add a **Webhook** node
-2. Set the HTTP Method to `POST`
-3. Copy the webhook URL - configure your WhatsApp service to send messages here
-
-The incoming data should include:
-- `imageData` - Base64-encoded image
-- `mimeType` - Image MIME type (e.g., `image/jpeg`)
+2. **HTTP Method:** `POST`
+3. Copy the webhook URL for your WhatsApp integration
 
 ---
 
-### Node 2: Get OAuth Token (HTTP Request)
+### Node 2: HTTP Request (Analyze Receipt)
 
-This node calls a helper endpoint on your Vercel app that echoes back the OAuth token.
+Calls the Vercel API to analyze the receipt with Gemini AI.
 
-1. Add an **HTTP Request** node, name it `Get Access Token`
-2. Configure:
-   - **Method:** `GET`
-   - **URL:** `https://your-app.vercel.app/api/get-token`
-   - **Authentication:** `Predefined Credential Type`
-   - **Credential Type:** `Google Drive OAuth2 API`
-   - **Credential:** Select your `Google Drive account`
-
-3. Leave everything else as default
-
-**What happens:**
-- n8n adds the OAuth token to the `Authorization: Bearer xxx` header
-- Your Vercel endpoint echoes back the token
-- The response contains: `{ "success": true, "access_token": "ya29.xxx..." }`
-
-**Output:**
-```json
-{
-  "success": true,
-  "access_token": "ya29.a0AfH6SMB..."
-}
-```
-
-### Node 3: HTTP Request (Call Vercel API)
-
-1. Add an **HTTP Request** node, name it `Process Receipt`
+1. Add an **HTTP Request** node, name it `Analyze Receipt`
 2. Configure:
    - **Method:** `POST`
-   - **URL:** `https://your-app.vercel.app/api/process-receipt`
-
-3. **Headers:**
+   - **URL:** `https://escher-financial-manager.vercel.app/api/process-receipt`
+3. **Send Headers:** ON
+4. **Header Parameters:**
    | Name | Value |
    |------|-------|
    | `Content-Type` | `application/json` |
    | `X-API-KEY` | `your-receipt-api-key` |
-   | `Authorization` | `Bearer {{ $json.access_token }}` |
-
-4. **Body → Content Type:** `JSON`
-5. **Body → JSON:**
+5. **Send Body:** ON
+6. **Body Content Type:** `JSON`
+7. **Body:**
    ```json
    {
-     "base64Image": "{{ $json.imageData }}",
-     "mimeType": "{{ $json.mimeType }}",
-     "spreadsheetId": "your-google-sheet-id"
+     "base64Image": "={{ $json.imageData }}",
+     "mimeType": "={{ $json.mimeType }}"
    }
    ```
 
-6. **Response Format:** `JSON`
-
----
-
-### Node 4: Handle Response (Optional)
-
-Add an **IF** node to check for success:
-
-1. **Condition:**
-   - **Value 1:** `{{ $json.success }}`
-   - **Operation:** `Equals`
-   - **Value 2:** `true`
-
-2. **True branch:** Send success notification
-3. **False branch:** Send error notification or log
-
----
-
-## What the Vercel API Does
-
-The `/api/process-receipt` endpoint now handles everything:
-
-1. ✅ **Analyzes** the receipt using Gemini AI
-2. ✅ **Creates** folder structure in Google Drive (Escher Finance Manager / Year / Month)
-3. ✅ **Uploads** the receipt image
-4. ✅ **Appends** the expense to Google Sheets
-
-**Response:**
+**Response contains:**
 ```json
 {
   "success": true,
   "expense": {
-    "id": "20260110-Food-restaurant-name",
+    "id": "20260110-Food-restaurant",
     "date": "2026-01-10",
     "category": "Food",
-    "description": "Restaurant Name",
+    "merchant": "Restaurant Name",
     "amount": 150000,
-    "receiptUrl": "https://drive.google.com/file/d/.../view"
-  }
+    "fileName": "receipt-20260110-Food-restaurant.jpg",
+    "folderYear": "2026",
+    "folderMonth": "January"
+  },
+  "base64Image": "...",
+  "mimeType": "image/jpeg"
 }
 ```
+
+---
+
+### Node 3: Code (Convert to Binary)
+
+Converts the base64 image to binary for Google Drive upload.
+
+1. Add a **Code** node, name it `Convert to Binary`
+2. **Mode:** `Run Once for All Items`
+3. **Code:**
+
+```javascript
+const items = $input.all();
+
+return Promise.all(items.map(async (item) => {
+  const base64Data = item.json.base64Image;
+  const mimeType = item.json.mimeType;
+  const fileName = item.json.expense.fileName;
+  
+  // Clean base64 (remove data URI prefix if present)
+  const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+  
+  return {
+    json: item.json,
+    binary: {
+      file: await this.helpers.prepareBinaryData(
+        Buffer.from(cleanBase64, 'base64'),
+        fileName,
+        mimeType
+      )
+    }
+  };
+}));
+```
+
+---
+
+### Node 4: Google Drive (Upload File)
+
+Uploads the receipt image to Google Drive.
+
+1. Add a **Google Drive** node, name it `Upload to Drive`
+2. Configure:
+   - **Credential:** Select your Google Drive credential
+   - **Resource:** `File`
+   - **Operation:** `Upload`
+3. **Input Data Field Name:** `file`
+4. **File Name** (Expression): `={{ $json.expense.fileName }}`
+5. **Parent Drive:** `My Drive`
+6. **Parent Folder:** 
+   - Click the dropdown and navigate to your pre-created folder
+   - Select: `Escher Finance Manager / 2026 / January`
+   
+   > **Note:** For dynamic folders, you'll need to add folder lookup nodes. For simplicity, start with a fixed folder.
+
+7. **Options → Add option → Permissions:**
+   - Click **Add Permission**
+   - **Type:** `Anyone`
+   - **Role:** `Reader`
+
+---
+
+### Node 5: Google Sheets (Append Row)
+
+Adds the expense to your Google Sheet.
+
+1. Add a **Google Sheets** node, name it `Log to Sheet`
+2. Configure:
+   - **Credential:** Select your Google Sheets credential
+   - **Resource:** `Sheet`
+   - **Operation:** `Append Row`
+3. **Document:** Select your Google Sheet
+4. **Sheet Name:** `Expenses`
+5. **Mapping → Manual Mapping:**
+
+| Column | Value |
+|--------|-------|
+| ID | `={{ $node["Analyze Receipt"].json.expense.id }}` |
+| Date | `={{ $node["Analyze Receipt"].json.expense.date }}` |
+| Category | `={{ $node["Analyze Receipt"].json.expense.category }}` |
+| Description | `={{ $node["Analyze Receipt"].json.expense.merchant }}` |
+| Amount | `={{ $node["Analyze Receipt"].json.expense.amount }}` |
+| Receipt URL | `={{ $node["Upload to Drive"].json.webViewLink }}` |
+| Notes | (leave empty) |
+
+---
+
+## Workflow Connections
+
+```
+Webhook → Analyze Receipt → Convert to Binary → Upload to Drive → Log to Sheet
+```
+
+Make sure each node connects to the next in sequence.
+
+---
+
+## Testing
+
+1. **Activate** the workflow
+2. **Send a test request** to your webhook with:
+   ```json
+   {
+     "imageData": "base64-encoded-image-here",
+     "mimeType": "image/jpeg"
+   }
+   ```
+3. **Check:**
+   - ✅ Receipt analyzed correctly
+   - ✅ File uploaded to Google Drive
+   - ✅ Row added to Google Sheets
 
 ---
 
 ## Troubleshooting
 
-### "Invalid Credentials" or 401 Error
+### Binary Data Lost
 
-1. **Re-authenticate** your Google credential in n8n:
-   - Go to Settings → Credentials
-   - Find your Google Drive OAuth2 credential
-   - Click Edit → Reconnect
+If Google Drive upload fails with "no binary data":
+- Make sure the Code node is directly before the Google Drive node
+- Check that `this.helpers.prepareBinaryData` is used correctly
 
-2. **Check scopes:** Ensure your credential has access to:
-   - Google Drive (for folder creation and file upload)
-   - Google Sheets (for appending rows)
+### 401 Invalid Credentials
 
-### "Could not get Google access token"
+- Re-authenticate your Google credentials in n8n
+- Ensure APIs are enabled in Google Cloud Console
 
-- The credential name in the Code node might be wrong
-- Try checking your credential's internal name in n8n's database or use the expression: `{{ $credentials }}`
+### Folder Not Found
 
-### "Missing Authorization header"
-
-- Make sure the HTTP Request node has the `Authorization` header set
-- Verify the expression: `Bearer {{ $json.googleAccessToken }}`
-
-### "Missing fields: spreadsheetId"
-
-- Add `spreadsheetId` to your HTTP Request body
-- Get your spreadsheet ID from the Google Sheets URL: `https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit`
+- Manually create the folder structure in Google Drive first
+- Make sure the folder is in "My Drive", not shared with you
 
 ---
 
-## Complete Workflow Summary
+## Dynamic Folder Structure (Advanced)
 
-| Step | Node Type | Name | Purpose |
-|------|-----------|------|---------|
-| 1 | Webhook | `WhatsApp Trigger` | Receives receipt image from WhatsApp |
-| 2 | Code | `Get Access Token` | Extracts fresh OAuth token from n8n |
-| 3 | HTTP Request | `Process Receipt` | Calls Vercel API with token + image |
-| 4 | IF | `Check Success` | Handles success/failure (optional) |
+If you want folders created automatically based on date, you'll need additional nodes:
 
----
+1. **Google Drive Search** - Find or create year folder
+2. **IF Node** - Check if exists
+3. **Google Drive Create Folder** - Create if not exists
+4. **Repeat for month folder**
 
-## Security Notes
-
-- Never commit API keys to version control
-- The OAuth token is automatically refreshed by n8n
-- The `X-API-KEY` should be a strong, randomly generated string
-- Store sensitive values in n8n's credentials system, not in the workflow
+This is complex due to binary data not passing through IF nodes. The simpler approach is to manually create folders monthly.
