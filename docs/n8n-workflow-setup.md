@@ -116,7 +116,7 @@ This is the most complex part. We need to:
 
 #### Node 3a: Code Node (Convert Base64 to Binary)
 
-1. Add a **Code** node after the HTTP Request node
+1. Add a **Code** node after the HTTP Request node, **name it `Convert to Binary`**
 2. Set **Mode** to `Run Once for All Items`
 3. Paste this code:
 
@@ -156,54 +156,60 @@ return [{
 }];
 ```
 
+**Output fields available for later nodes:**
+- `{{ $node["Convert to Binary"].json.folderYear }}` → e.g., "2026"
+- `{{ $node["Convert to Binary"].json.folderMonth }}` → e.g., "January"
+- `{{ $node["Convert to Binary"].json.fileName }}` → e.g., "receipt-20260110-Food-restaurant.jpg"
+- `{{ $node["Convert to Binary"].json.data.id }}` → expense ID
+- `{{ $node["Convert to Binary"].json.data.merchant }}` → merchant name
+- Binary field `file` → the receipt image
+
 ---
 
-#### Node 3b: Google Drive - Find Root Folder
+#### Node 3b: Find Root Folder
 
-1. Add a **Google Drive** node
+1. Add a **Google Drive** node, **name it `Find Root Folder`**
 2. Configure:
    - **Credential:** Select your Google Drive OAuth2 credential
    - **Resource:** `File`
    - **Operation:** `Search`
-3. **Search Settings:**
-   - **Query String:** `name = 'Escher Finance Manager' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`
+3. **Query String:**
+   ```
+   name = 'Escher Finance Manager' and mimeType = 'application/vnd.google-apps.folder' and trashed = false
+   ```
 4. **Options:**
    - **What To Return:** `All`
 
 ---
 
-#### Node 3c: IF Node (Check if Root Folder Exists)
+#### Node 3c: Check Root Exists (IF Node)
 
-1. Add an **IF** node
+1. Add an **IF** node, **name it `Check Root Exists`**
 2. Configure **Conditions:**
-   - **Value 1:** `{{ $json.length }}`
-   - **Operation:** `Greater Than`
-   - **Value 2:** `0`
+   - **Value 1:** `{{ $json.length }}` (toggle to Expression mode ⚡)
+   - **Operation:** `Is Not Empty`
 
-**True branch:** Root folder exists, proceed with the folder ID
-**False branch:** Create the root folder first
+**True branch** → Root folder exists, passes the found folder
+**False branch** → Root folder doesn't exist, create it
 
 ---
 
-#### Node 3d: Google Drive - Create Root Folder (False Branch)
+#### Node 3d: Create Root Folder (False Branch)
 
-1. Add a **Google Drive** node on the **False** output
+1. Add a **Google Drive** node on the **False** output, **name it `Create Root Folder`**
 2. Configure:
    - **Credential:** Select your Google Drive OAuth2 credential
    - **Resource:** `Folder`
    - **Operation:** `Create`
-3. **Folder Settings:**
-   - **Folder Name:** `Escher Finance Manager`
+3. **Folder Name:** `Escher Finance Manager`
 
 ---
 
-#### Node 3e: Merge Node
+#### Node 3e: Merge Root Folder
 
-Connect both the **True** branch (from IF node) and **False** branch (from Create Folder node) to this Merge node.
-
-1. Add a **Merge** node
-2. Connect **Input 1** ← True branch output (found folder)
-3. Connect **Input 2** ← False branch output (created folder)
+1. Add a **Merge** node, **name it `Merge Root Folder`**
+2. Connect **Input 1** ← True branch from "Check Root Exists"
+3. Connect **Input 2** ← Output from "Create Root Folder"
 4. Configure:
    - **Mode:** `Append`
 
@@ -213,71 +219,182 @@ Connect both the **True** branch (from IF node) and **False** branch (from Creat
 
 Append mode simply passes through whichever input has data to the next node.
 
-**Output:** The folder ID will be available as `{{ $json.id }}` for the next step.
+**Output:** The root folder ID is now available as:
+```
+{{ $node["Merge Root Folder"].json.id }}
+```
 
 ---
 
-#### Node 3f: Google Drive - Find or Create Year Folder
+#### Node 3f: Find or Create Year Folder
 
-Repeat the same pattern for the Year folder:
+This section requires 4 sub-nodes. Name them exactly as shown for the expressions to work.
 
-1. **Google Drive Search:**
-   - **Query:** `name = '{{ $json.folderYear }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ ROOT_FOLDER_ID }}' in parents and trashed = false`
+##### Node: "Find Year Folder" (Google Drive Search)
 
-2. **IF Node:** Check if exists
+1. Add a **Google Drive** node, name it `Find Year Folder`
+2. Configure:
+   - **Credential:** Select your Google Drive OAuth2 credential
+   - **Resource:** `File`
+   - **Operation:** `Search`
+3. **Query String** (toggle to Expression mode ⚡):
+   ```
+   name = '{{ $node["Convert to Binary"].json.folderYear }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ $node["Merge Root Folder"].json.id }}' in parents and trashed = false
+   ```
+4. **Options:**
+   - **What To Return:** `All`
 
-3. **Google Drive Create Folder (if not exists):**
-   - **Folder Name:** `{{ $json.folderYear }}`
-   - **Parent:** Use the root folder ID from previous step
+##### Node: "Check Year Exists" (IF Node)
+
+1. Add an **IF** node, name it `Check Year Exists`
+2. Configure **Conditions:**
+   - **Value 1:** `{{ $json.length }}` (Expression mode)
+   - **Operation:** `Is Not Empty` or `Greater Than 0`
+
+##### Node: "Create Year Folder" (Google Drive - False Branch)
+
+1. Add a **Google Drive** node on the **False** output, name it `Create Year Folder`
+2. Configure:
+   - **Credential:** Select your Google Drive OAuth2 credential
+   - **Resource:** `Folder`
+   - **Operation:** `Create`
+3. **Folder Name** (Expression mode ⚡):
+   ```
+   {{ $node["Convert to Binary"].json.folderYear }}
+   ```
+4. **Parent** (Expression mode ⚡):
+   ```
+   {{ $node["Merge Root Folder"].json.id }}
+   ```
+
+##### Node: "Merge Year Folder" (Merge Node)
+
+1. Add a **Merge** node, name it `Merge Year Folder`
+2. Connect **Input 1** ← True branch from "Check Year Exists"
+3. Connect **Input 2** ← Output from "Create Year Folder"
+4. **Mode:** `Append`
 
 ---
 
-#### Node 3g: Google Drive - Find or Create Month Folder
+#### Node 3g: Find or Create Month Folder
 
-Repeat the same pattern for the Month folder:
+Repeat the same pattern. Name nodes exactly as shown.
 
-1. **Google Drive Search:**
-   - **Query:** `name = '{{ $json.folderMonth }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ YEAR_FOLDER_ID }}' in parents and trashed = false`
+##### Node: "Find Month Folder" (Google Drive Search)
 
-2. **IF Node:** Check if exists
+1. Add a **Google Drive** node, name it `Find Month Folder`
+2. Configure:
+   - **Credential:** Select your Google Drive OAuth2 credential
+   - **Resource:** `File`
+   - **Operation:** `Search`
+3. **Query String** (Expression mode ⚡):
+   ```
+   name = '{{ $node["Convert to Binary"].json.folderMonth }}' and mimeType = 'application/vnd.google-apps.folder' and '{{ $node["Merge Year Folder"].json.id }}' in parents and trashed = false
+   ```
+4. **Options:**
+   - **What To Return:** `All`
 
-3. **Google Drive Create Folder (if not exists):**
-   - **Folder Name:** `{{ $json.folderMonth }}`
-   - **Parent:** Use the year folder ID from previous step
+##### Node: "Check Month Exists" (IF Node)
+
+1. Add an **IF** node, name it `Check Month Exists`
+2. Configure **Conditions:**
+   - **Value 1:** `{{ $json.length }}` (Expression mode)
+   - **Operation:** `Is Not Empty` or `Greater Than 0`
+
+##### Node: "Create Month Folder" (Google Drive - False Branch)
+
+1. Add a **Google Drive** node on the **False** output, name it `Create Month Folder`
+2. Configure:
+   - **Credential:** Select your Google Drive OAuth2 credential
+   - **Resource:** `Folder`
+   - **Operation:** `Create`
+3. **Folder Name** (Expression mode ⚡):
+   ```
+   {{ $node["Convert to Binary"].json.folderMonth }}
+   ```
+4. **Parent** (Expression mode ⚡):
+   ```
+   {{ $node["Merge Year Folder"].json.id }}
+   ```
+
+##### Node: "Merge Month Folder" (Merge Node)
+
+1. Add a **Merge** node, name it `Merge Month Folder`
+2. Connect **Input 1** ← True branch from "Check Month Exists"
+3. Connect **Input 2** ← Output from "Create Month Folder"
+4. **Mode:** `Append`
 
 ---
 
-#### Node 3h: Google Drive - Upload Receipt File
+#### Node 3h: Upload Receipt File
 
-1. Add a **Google Drive** node
+1. Add a **Google Drive** node, name it `Upload Receipt`
 2. Configure:
    - **Credential:** Select your Google Drive OAuth2 credential
    - **Resource:** `File`
    - **Operation:** `Upload`
+
 3. **File Settings:**
    - **Input Binary Field:** `file`
-   - **File Name:** `{{ $node["Code"].json.fileName }}`
-   - **Parent Folder:** Use **Expression** → select the Month folder ID from previous node
-4. **Options:**
-   - **Share Permissions:** 
-     - **Permission Type:** `Anyone With Link`
-     - **Role:** `Reader`
+   - **File Name** (Expression mode ⚡):
+     ```
+     {{ $node["Convert to Binary"].json.fileName }}
+     ```
+   - **Parent Folder** (Expression mode ⚡):
+     ```
+     {{ $node["Merge Month Folder"].json.id }}
+     ```
+
+4. **Options → Add Option → Permissions:**
+   - Click **Add Permission**
+   - **Type:** `Anyone`
+   - **Role:** `Reader`
+
+**Output:** The uploaded file will have `webViewLink` available for Google Sheets:
+```
+{{ $node["Upload Receipt"].json.webViewLink }}
+```
+
+---
+
+#### Complete Node Name Reference
+
+Use these exact node names for all expressions to work:
+
+| Step | Node Name | Expression to Reference |
+|------|-----------|------------------------|
+| 3a | `Convert to Binary` | `{{ $node["Convert to Binary"].json.folderYear }}` |
+| 3b | `Find Root Folder` | - |
+| 3c | `Check Root Exists` | - |
+| 3d | `Create Root Folder` | - |
+| 3e | `Merge Root Folder` | `{{ $node["Merge Root Folder"].json.id }}` |
+| 3f | `Find Year Folder` | - |
+| 3f | `Check Year Exists` | - |
+| 3f | `Create Year Folder` | - |
+| 3f | `Merge Year Folder` | `{{ $node["Merge Year Folder"].json.id }}` |
+| 3g | `Find Month Folder` | - |
+| 3g | `Check Month Exists` | - |
+| 3g | `Create Month Folder` | - |
+| 3g | `Merge Month Folder` | `{{ $node["Merge Month Folder"].json.id }}` |
+| 3h | `Upload Receipt` | `{{ $node["Upload Receipt"].json.webViewLink }}` |
 
 ---
 
 #### Simplified Alternative: Single Upload to Fixed Folder
 
-If you don't need the Year/Month folder structure, you can skip nodes 3b-3g and just:
+If the dynamic folder structure is too complex, you can skip nodes 3b-3g:
 
-1. Manually create the folder structure in Google Drive:
-   - `Escher Finance Manager / 2026 / January` (and other months)
+1. **Manually create folders** in Google Drive:
+   - `Escher Finance Manager / 2026 / January`
+   - `Escher Finance Manager / 2026 / February`
+   - ... (create all months you need)
 
-2. Use a single **Google Drive Upload** node:
+2. **Use a single Google Drive Upload node:**
    - **Resource:** `File`
    - **Operation:** `Upload`
    - **Input Binary Field:** `file`
-   - **File Name:** `{{ $json.fileName }}`
-   - **Parent Folder:** Manually select the target folder from dropdown
+   - **File Name:** `{{ $node["Convert to Binary"].json.fileName }}`
+   - **Parent Folder:** Click dropdown → navigate to your folder → select it
 
 ---
 
