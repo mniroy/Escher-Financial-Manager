@@ -71,7 +71,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       return selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' });
     }
     if (viewMode === 'yearly-only') {
-      return `Yearly Events ${displayedYear}`;
+      return `Annual Events ${displayedYear}`;
     }
     return `Year ${displayedYear}`;
   }, [viewMode, selectedDate, displayedYear]);
@@ -195,7 +195,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <Plane className="w-6 h-6" />
                   </div>
                   <div className="flex-grow">
-                    <div className={`font-bold ${appMode === 'yearly' ? 'text-purple-900' : 'text-gray-700'}`}>Event / Trip Mode</div>
+                    <div className={`font-bold ${appMode === 'yearly' ? 'text-purple-900' : 'text-gray-700'}`}>Annual Events Mode</div>
                     <div className="text-xs text-gray-500">Log to a specific yearly plan</div>
                   </div>
                   {appMode === 'yearly' && (
@@ -326,7 +326,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               }`}
           >
             <Plane className="w-4 h-4" />
-            Yearly Events
+            Annual Events
           </button>
           <button
             onClick={() => setViewMode('yearly')}
@@ -345,13 +345,13 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-row md:flex-col justify-between items-center md:items-start">
           <p className="text-sm text-gray-500 font-medium">
-            {viewMode === 'monthly' ? 'Monthly Budget' : viewMode === 'yearly-only' ? 'Yearly Events Budget' : 'Annual Budget'}
+            {viewMode === 'monthly' ? 'Monthly Budget' : viewMode === 'yearly-only' ? 'Annual Events Budget' : 'Annual Budget'}
           </p>
           <h3 className="text-xl md:text-2xl font-bold text-emerald-600">{formatCurrency(totalBudget)}</h3>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-row md:flex-col justify-between items-center md:items-start">
           <p className="text-sm text-gray-500 font-medium">
-            {viewMode === 'yearly-only' ? 'Yearly Events Spent' : 'Spent'}
+            {viewMode === 'yearly-only' ? 'Annual Events Spent' : 'Spent'}
           </p>
           <h3 className="text-xl md:text-2xl font-bold text-gray-900">
             {formatCurrency(totalSpent)}
