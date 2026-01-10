@@ -43,33 +43,13 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
     scrollToBottom();
   }, [messages]);
 
-  // Scroll to latest message when keyboard opens
-  useEffect(() => {
-    const handleViewportChange = () => {
-      if (window.visualViewport) {
-        const viewportHeight = window.visualViewport.height;
-        const windowHeight = window.innerHeight;
-        const keyboardOffset = windowHeight - viewportHeight;
-
-        // If keyboard is open (significant height difference), scroll to bottom
-        if (keyboardOffset > 100) {
-          setTimeout(() => {
-            scrollToBottom();
-          }, 100);
-        }
-      }
-    };
-
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportChange);
-    }
-
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportChange);
-      }
-    };
-  }, []);
+  // Scroll to latest message when input is focused (keyboard opens)
+  const handleInputFocus = () => {
+    // Delay to allow keyboard to fully open
+    setTimeout(() => {
+      scrollToBottom();
+    }, 300);
+  };
 
   // Re-initialize Chat Session when Mode/Data changes
   useEffect(() => {
@@ -395,6 +375,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyPress}
+            onFocus={handleInputFocus}
             placeholder={appMode === 'yearly' && activePlan ? `Ask about ${activePlan.name}...` : "Type a message..."}
             className="flex-grow bg-transparent text-gray-900 px-4 py-2 focus:outline-none text-sm placeholder-gray-400"
             autoFocus
