@@ -130,19 +130,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Return analysis + metadata for n8n to use
         return res.status(200).json({
             success: true,
-            expense: {
+            data: {
                 id: expenseId,
                 date: expenseDate,
                 category: category,
                 merchant: merchant,
                 amount: amount,
-                fileName: fileName,
-                folderYear: year,
-                folderMonth: month
-            },
-            // Include base64 for n8n to upload
-            base64Image: base64Image,
-            mimeType: mimeType
+                base64Image: base64Image,
+                mimeType: mimeType
+            }
         });
     } catch (error: any) {
         console.error('Full Error:', error);

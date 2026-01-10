@@ -68,26 +68,39 @@ Webhook → Analyze Receipt → Convert to Binary ─┬─→ Find/Create Folde
 3. **Code:**
 
 ```javascript
-const items = $input.all();
+// Get the response data from HTTP Request
+const responseData = $input.first().json;
+const base64Data = responseData.data.base64Image;
+const mimeType = responseData.data.mimeType;
+const expenseId = responseData.data.id;
+const expenseDate = responseData.data.date;
 
-return Promise.all(items.map(async (item) => {
-  const base64Data = item.json.base64Image;
-  const mimeType = item.json.mimeType;
-  const fileName = item.json.expense.fileName;
-  
-  const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
-  
-  return {
-    json: item.json,
-    binary: {
-      file: await this.helpers.prepareBinaryData(
-        Buffer.from(cleanBase64, 'base64'),
-        fileName,
-        mimeType
-      )
-    }
-  };
-}));
+// Remove data URI prefix if present
+const cleanBase64 = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+
+// Parse date for folder structure
+const dateParts = expenseDate.split('-');
+const year = dateParts[0];
+const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                    'July', 'August', 'September', 'October', 'November', 'December'];
+const month = monthNames[parseInt(dateParts[1], 10) - 1];
+
+// Return both JSON data and binary data
+return [{
+  json: {
+    ...responseData,
+    folderYear: year,
+    folderMonth: month,
+    fileName: `receipt-${expenseId}.jpg`
+  },
+  binary: {
+    file: await this.helpers.prepareBinaryData(
+      Buffer.from(cleanBase64, 'base64'),
+      `receipt-${expenseId}.jpg`,
+      mimeType
+    )
+  }
+}];
 ```
 
 ---
