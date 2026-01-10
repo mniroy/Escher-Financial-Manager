@@ -131,12 +131,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
   return (
     <div
-      className="min-h-screen flex flex-col bg-gray-50 text-gray-900"
+      className="h-screen flex flex-col bg-gray-50 text-gray-900 overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <header className="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-50">
+      <header className="bg-indigo-600 text-white p-4 shadow-md sticky top-0 z-50 flex-shrink-0">
         <div className="max-w-5xl mx-auto flex flex-col items-center gap-4">
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setActiveTab('dashboard')} aria-label="Logo">
@@ -219,13 +219,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
       <main
         ref={contentRef}
-        className="flex-1 flex flex-col w-full max-w-5xl mx-auto transition-transform duration-200 ease-out overflow-hidden"
+        className="flex-1 flex flex-col w-full max-w-5xl mx-auto transition-transform duration-200 ease-out overflow-hidden min-h-0"
         style={{ transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : 'none' }}
       >
         {children}
       </main>
 
-      <footer className="bg-white border-t p-4 text-center text-gray-500 text-xs">
+      <footer className="bg-white border-t p-2 text-center text-gray-500 text-xs flex-shrink-0">
         Synced with Google Drive • Escher Financial Manager
       </footer>
     </div>
