@@ -369,7 +369,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 ) : (
                     <>
                         {/* Mobile View - Compact */}
-                        <div className="md:hidden divide-y divide-gray-100 flex-1 overflow-y-auto overscroll-contain">
+                        <div className="md:hidden divide-y divide-gray-100 flex-1 overflow-y-auto overscroll-contain" style={{ touchAction: 'pan-y' }}>
                             {sortedExpenses.map((expense) => {
                                 const expDate = new Date(expense.date);
                                 return (
