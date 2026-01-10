@@ -33,7 +33,6 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   // Keyboard visibility detection using VisualViewport API
   useEffect(() => {
@@ -44,15 +43,7 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         const keyboardOffset = windowHeight - viewportHeight;
 
         // Only set keyboard height if it's significant (> 100px, to avoid false positives)
-        if (keyboardOffset > 100) {
-          setKeyboardHeight(keyboardOffset);
-          // Scroll container to keep input visible
-          setTimeout(() => {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }, 100);
-        } else {
-          setKeyboardHeight(0);
-        }
+        setKeyboardHeight(keyboardOffset > 100 ? keyboardOffset : 0);
       }
     };
 
@@ -348,15 +339,11 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className="flex flex-col h-full bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200"
-      style={{ paddingBottom: keyboardHeight > 0 ? `${keyboardHeight}px` : undefined }}
-    >
+    <div className="relative flex flex-col h-full bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200">
 
       {/* Messages Area - WhatsApp Style */}
       <div
-        className="flex-grow overflow-y-auto p-4 space-y-3"
+        className="flex-grow overflow-y-auto p-4 pb-20 space-y-3"
         style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}
       >
         {messages.map((msg) => (
@@ -399,8 +386,11 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <div className="p-3 bg-white border-t border-gray-200">
+      {/* Input Area - Fixed at bottom, moves up with keyboard */}
+      <div
+        className="absolute left-0 right-0 p-3 bg-white border-t border-gray-200 transition-all duration-150"
+        style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 0 }}
+      >
         <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-2 border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
           <input
             type="text"
