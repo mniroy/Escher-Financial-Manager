@@ -362,9 +362,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             {/* Content */}
             <div className="relative z-10 flex flex-col justify-center py-2">
               <div className="text-center mb-4">
-                {viewMode === 'yearly-only' && selectedAnnualPlan && (
-                  <p className="text-white font-semibold text-sm mb-1">{selectedAnnualPlan}</p>
-                )}
                 <p className="text-white/70 text-[10px] uppercase tracking-wider mb-1">
                   {viewMode === 'yearly-only' && selectedAnnualPlan ? 'Remaining' : 'Total Balance'}
                 </p>
