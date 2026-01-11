@@ -62,3 +62,15 @@ export interface User {
   spreadsheetId?: string;
   tokenExpiry?: number; // Timestamp when the access token expires
 }
+
+export interface Notification {
+  id: string;
+  type: 'receipt' | 'budget-warning' | 'budget-exceeded';
+  source: 'app' | 'whatsapp' | 'manual-edit';
+  title: string;
+  message: string;
+  timestamp: string; // ISO date string
+  read: boolean;
+  expenseId?: string; // link to related expense
+  category?: string; // for budget alerts
+}

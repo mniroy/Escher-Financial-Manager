@@ -4,14 +4,15 @@ import { User as UserType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
+  unreadNotificationCount?: number;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh, user, onLogout }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh, user, onLogout, unreadNotificationCount = 0 }) => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   // Pull to refresh state
@@ -150,11 +151,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             {activeTab === 'input' && 'Add Expense'}
             {activeTab === 'budget' && 'Budget'}
             {activeTab === 'chat' && 'Assistant'}
+            {activeTab === 'notifications' && 'Notifications'}
           </h1>
 
           {/* Notification Icon */}
-          <button className="p-2 -mr-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+          <button
+            onClick={() => setActiveTab('notifications')}
+            className="p-2 -mr-2 text-gray-700 hover:bg-gray-100 rounded-lg relative"
+          >
             <Bell className="w-5 h-5" />
+            {unreadNotificationCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center">
+                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+              </span>
+            )}
           </button>
         </div>
       </header>
