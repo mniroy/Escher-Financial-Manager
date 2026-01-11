@@ -294,6 +294,7 @@ export default function App() {
         <Dashboard
           expenses={expenses}
           budgetItems={budgetItems}
+          user={user}
         />
       )}
       {activeTab === 'input' && (

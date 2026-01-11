@@ -1,20 +1,33 @@
 import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
-import { Expense, BudgetLineItem } from '../types';
-import { Calendar, TrendingUp, ChevronLeft, ChevronRight, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart } from 'lucide-react';
+import { Expense, BudgetLineItem, User } from '../types';
+import { Calendar, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
+  user: User;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
   expenses,
-  budgetItems
+  budgetItems,
+  user
 }) => {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // Get greeting based on time of day
+  const greeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+  }, []);
+
+  // Get first name
+  const firstName = user.name.split(' ')[0];
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();
@@ -169,22 +182,46 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto overscroll-none">
 
-      {/* Stats Cards - Fixed Layout */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
-        <div className="grid grid-cols-3 divide-x divide-gray-100">
-          <div className="text-center px-2">
-            <p className="text-[10px] text-gray-400 uppercase">Budget</p>
-            <p className="text-sm sm:text-lg font-bold text-emerald-600">{formatCurrency(totalBudget)}</p>
+      {/* Greeting & Period Selector */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img src={user.picture} alt="Profile" className="w-12 h-12 rounded-full border-2 border-indigo-200" />
+          <div>
+            <p className="text-sm text-gray-500">{greeting}</p>
+            <p className="text-lg font-bold text-gray-900">{firstName}</p>
           </div>
-          <div className="text-center px-2">
-            <p className="text-[10px] text-gray-400 uppercase">Spent</p>
-            <p className="text-sm sm:text-lg font-bold text-gray-900">{formatCurrency(totalSpent)}</p>
+        </div>
+
+        {/* Period Selector */}
+        <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2">
+          <span className="text-sm font-medium text-gray-700">{dateLabel}</span>
+          <ChevronDown className="w-4 h-4 ml-1 text-gray-500" />
+        </div>
+      </div>
+
+      {/* Balance Card */}
+      <div className="bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg">
+        <div className="text-center mb-4">
+          <p className="text-indigo-200 text-sm mb-1">Left</p>
+          <p className={`text-3xl font-bold ${totalRemaining < 0 ? 'text-red-300' : 'text-white'}`}>
+            {formatCurrency(totalRemaining)}
+          </p>
+        </div>
+
+        <div className="flex justify-around pt-4 border-t border-white/20">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <ArrowUp className="w-4 h-4 text-emerald-300" />
+              <span className="text-xs text-indigo-200">Budget</span>
+            </div>
+            <p className="text-lg font-semibold">{formatCurrency(totalBudget)}</p>
           </div>
-          <div className="text-center px-2">
-            <p className="text-[10px] text-gray-400 uppercase">Left</p>
-            <p className={`text-sm sm:text-lg font-bold ${totalRemaining < 0 ? 'text-red-600' : 'text-gray-800'}`}>
-              {formatCurrency(totalRemaining)}
-            </p>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 mb-1">
+              <ArrowDown className="w-4 h-4 text-red-300" />
+              <span className="text-xs text-indigo-200">Spent</span>
+            </div>
+            <p className="text-lg font-semibold">{formatCurrency(totalSpent)}</p>
           </div>
         </div>
       </div>
