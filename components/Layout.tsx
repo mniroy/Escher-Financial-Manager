@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Download, RefreshCw, LogOut, Home, BarChart3, ClipboardList, MessageSquare, Plus } from 'lucide-react';
+import { Download, RefreshCw, LogOut, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Bell } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
@@ -136,32 +136,26 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <header className="bg-indigo-600 text-white px-4 py-3 shadow-lg flex-shrink-0">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between max-w-5xl mx-auto">
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-              <span className="text-lg font-bold">E</span>
-            </div>
-            <h1 className="text-lg font-bold">Escher</h1>
-          </div>
+          {/* Menu Icon */}
+          <button className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+            <LayoutGrid className="w-5 h-5" />
+          </button>
 
-          {/* User Profile & Actions */}
-          <div className="flex items-center gap-3">
-            {installPrompt && (
-              <button
-                onClick={handleInstallClick}
-                className="p-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 transition-colors"
-                title="Install App"
-              >
-                <Download className="w-4 h-4" />
-              </button>
-            )}
-            <img src={user.picture} alt="Profile" className="w-8 h-8 rounded-full border-2 border-indigo-400" />
-            <button onClick={onLogout} title="Logout" className="text-indigo-200 hover:text-white">
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
+          {/* Page Title */}
+          <h1 className="text-base font-semibold text-gray-900">
+            {activeTab === 'dashboard' && 'Home'}
+            {activeTab === 'transactions' && 'Transactions'}
+            {activeTab === 'input' && 'Add Expense'}
+            {activeTab === 'budget' && 'Budget'}
+            {activeTab === 'chat' && 'Assistant'}
+          </h1>
+
+          {/* Notification Icon */}
+          <button className="p-2 -mr-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+            <Bell className="w-5 h-5" />
+          </button>
         </div>
       </header>
 
