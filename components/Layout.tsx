@@ -139,8 +139,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     >
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between max-w-5xl mx-auto">
-          {/* Menu Icon */}
-          <button className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+          {/* Home Icon */}
+          <button
+            onClick={() => setActiveTab('dashboard')}
+            className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+          >
             <LayoutGrid className="w-5 h-5" />
           </button>
 

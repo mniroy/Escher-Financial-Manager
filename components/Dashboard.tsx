@@ -258,15 +258,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto overscroll-none">
 
-      {/* Greeting */}
-      <div className="flex items-center gap-3">
-        <img src={user.picture} alt="Profile" className="w-10 h-10 rounded-full border-2 border-indigo-200" />
-        <div>
-          <p className="text-xs text-gray-500">{greeting}</p>
-          <p className="text-base font-bold text-gray-900">{firstName}</p>
-        </div>
-      </div>
-
       {/* Period Selector - Above Balance Card */}
       <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between gap-2">
         {/* Date Navigation */}
