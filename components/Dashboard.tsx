@@ -391,9 +391,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       </div>
 
       {/* Main Chart - Compact Progress Bar Style */}
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex-1 min-h-0 overflow-hidden">
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
         <h3 className="text-sm font-semibold text-gray-700 mb-3">Spending vs Budget</h3>
-        <div className="h-[200px] sm:h-[280px] overflow-y-auto space-y-3 pr-1">
+        <div className="space-y-3">
           {chartData.length > 0 ? (
             chartData.map((item, index) => {
               const percentage = item.budget > 0 ? Math.min((item.spent / item.budget) * 100, 150) : 0;
