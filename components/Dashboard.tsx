@@ -225,20 +225,56 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto overscroll-none">
 
-      {/* Greeting & Period Selector */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src={user.picture} alt="Profile" className="w-12 h-12 rounded-full border-2 border-indigo-200" />
-          <div>
-            <p className="text-sm text-gray-500">{greeting}</p>
-            <p className="text-lg font-bold text-gray-900">{firstName}</p>
+      {/* Greeting */}
+      <div className="flex items-center gap-3">
+        <img src={user.picture} alt="Profile" className="w-10 h-10 rounded-full border-2 border-indigo-200" />
+        <div>
+          <p className="text-xs text-gray-500">{greeting}</p>
+          <p className="text-base font-bold text-gray-900">{firstName}</p>
+        </div>
+      </div>
+
+      {/* Period Selector - Above Balance Card */}
+      <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between gap-2">
+        {/* Date Navigation */}
+        <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
+          <button onClick={handlePrev} className="p-1.5 hover:bg-gray-200 rounded-l-md">
+            <ChevronLeft className="w-4 h-4 text-gray-600" />
+          </button>
+          <div className="px-2 py-1 min-w-[90px] sm:min-w-[120px] text-center font-medium text-gray-800 text-xs sm:text-sm">
+            {dateLabel}
           </div>
+          <button onClick={handleNext} className="p-1.5 hover:bg-gray-200 rounded-r-md">
+            <ChevronRight className="w-4 h-4 text-gray-600" />
+          </button>
         </div>
 
-        {/* Period Selector */}
-        <div className="flex items-center bg-gray-100 rounded-lg px-3 py-2">
-          <span className="text-sm font-medium text-gray-700">{dateLabel}</span>
-          <ChevronDown className="w-4 h-4 ml-1 text-gray-500" />
+        {/* View Toggle */}
+        <div className="bg-gray-100 p-0.5 rounded-lg flex shadow-inner">
+          <button
+            onClick={() => setViewMode('monthly')}
+            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${viewMode === 'monthly'
+              ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <Calendar className="w-3 h-3" />
+            <span className="hidden sm:inline">Monthly</span>
+          </button>
+          <button
+            onClick={() => setViewMode('yearly-only')}
+            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${viewMode === 'yearly-only'
+              ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <Plane className="w-3 h-3" />
+            <span className="hidden sm:inline">Annual</span>
+          </button>
+          <button
+            onClick={() => setViewMode('yearly')}
+            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${viewMode === 'yearly'
+              ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            <TrendingUp className="w-3 h-3" />
+            <span className="hidden sm:inline">Year</span>
+          </button>
         </div>
       </div>
 
@@ -344,50 +380,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <p className="text-lg font-bold text-rose-500">{monthlyStats.topCategoryPercent.toFixed(1)}%</p>
           </div>
-        </div>
-      </div>
-
-      {/* View Controls - Below Stats */}
-      <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex items-center justify-between gap-2">
-        {/* Date Navigation */}
-        <div className="flex items-center bg-gray-50 rounded-lg border border-gray-200">
-          <button onClick={handlePrev} className="p-1.5 hover:bg-gray-200 rounded-l-md">
-            <ChevronLeft className="w-4 h-4 text-gray-600" />
-          </button>
-          <div className="px-2 py-1 min-w-[90px] sm:min-w-[120px] text-center font-medium text-gray-800 text-xs sm:text-sm">
-            {dateLabel}
-          </div>
-          <button onClick={handleNext} className="p-1.5 hover:bg-gray-200 rounded-r-md">
-            <ChevronRight className="w-4 h-4 text-gray-600" />
-          </button>
-        </div>
-
-        {/* View Toggle */}
-        <div className="bg-gray-100 p-0.5 rounded-lg flex shadow-inner">
-          <button
-            onClick={() => setViewMode('monthly')}
-            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${viewMode === 'monthly'
-              ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <Calendar className="w-3 h-3" />
-            <span className="hidden sm:inline">Monthly</span>
-          </button>
-          <button
-            onClick={() => setViewMode('yearly-only')}
-            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${viewMode === 'yearly-only'
-              ? 'bg-white text-purple-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <Plane className="w-3 h-3" />
-            <span className="hidden sm:inline">Annual</span>
-          </button>
-          <button
-            onClick={() => setViewMode('yearly')}
-            className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${viewMode === 'yearly'
-              ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            <TrendingUp className="w-3 h-3" />
-            <span className="hidden sm:inline">Year</span>
-          </button>
         </div>
       </div>
 
