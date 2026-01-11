@@ -302,7 +302,6 @@ export default function App() {
           appMode={appMode}
           activePlan={activePlan}
           onModeChange={handleModeChange}
-          user={user}
         />
       )}
       {activeTab === 'transactions' && (
