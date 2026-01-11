@@ -17,12 +17,11 @@ import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [showLoggerFromFab, setShowLoggerFromFab] = useState(false);
 
   // Global App Mode State (Persistent)
   const [appMode, setAppMode] = useState<'standard' | 'yearly'>('standard');
@@ -290,26 +289,30 @@ export default function App() {
       onRefresh={() => loadData(user)}
       user={user}
       onLogout={handleLogout}
-      onOpenLogger={() => {
-        setActiveTab('dashboard');
-        setShowLoggerFromFab(true);
-      }}
     >
       {activeTab === 'dashboard' && (
         <Dashboard
           expenses={expenses}
           budgetItems={budgetItems}
-          onSaveExpense={handleExpenseSave}
-          onUploadReceipt={async (base64Data, mimeType, fileName, expenseDate) => {
-            if (!user) throw new Error('User not logged in');
-            return await uploadReceiptToDrive(user, base64Data, mimeType, fileName, expenseDate);
-          }}
           appMode={appMode}
           activePlan={activePlan}
           onModeChange={handleModeChange}
-          forceShowLogger={showLoggerFromFab}
-          onLoggerClose={() => setShowLoggerFromFab(false)}
         />
+      )}
+      {activeTab === 'input' && (
+        <div className="flex-1 p-4 overflow-y-auto">
+          <ExpenseLogger
+            onSave={handleExpenseSave}
+            onUploadReceipt={async (base64Data, mimeType, fileName, expenseDate) => {
+              if (!user) throw new Error('User not logged in');
+              return await uploadReceiptToDrive(user, base64Data, mimeType, fileName, expenseDate);
+            }}
+            budgetItems={budgetItems}
+            appMode={appMode}
+            activePlan={activePlan}
+            onModeChange={handleModeChange}
+          />
+        </div>
       )}
       {activeTab === 'transactions' && (
         <TransactionList

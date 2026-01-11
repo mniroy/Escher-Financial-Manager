@@ -1,43 +1,26 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
-import { Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart } from 'lucide-react';
-import ExpenseLogger from './ExpenseLogger';
+import { Calendar, TrendingUp, ChevronLeft, ChevronRight, X, Plane, CreditCard, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart } from 'lucide-react';
 
 interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
-  onSaveExpense: (expense: Expense) => Promise<void>;
-  onUploadReceipt: (base64Data: string, mimeType: string, fileName: string, expenseDate: string) => Promise<string>;
   appMode: 'standard' | 'yearly';
   activePlan: string;
   onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;
-  forceShowLogger?: boolean;
-  onLoggerClose?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
   expenses,
   budgetItems,
-  onSaveExpense,
-  onUploadReceipt,
   appMode,
   activePlan,
-  onModeChange,
-  forceShowLogger,
-  onLoggerClose
+  onModeChange
 }) => {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showLogger, setShowLogger] = useState(false);
-
-  // Sync with forceShowLogger prop
-  useEffect(() => {
-    if (forceShowLogger) {
-      setShowLogger(true);
-    }
-  }, [forceShowLogger]);
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();
@@ -272,39 +255,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             <X className="w-4 h-4" />
           </button>
         </div>
-      )}
-
-      {/* Quick Log Button */}
-      {showLogger ? (
-        <div className="bg-white rounded-xl shadow-lg border-2 border-indigo-100 overflow-hidden relative flex-shrink-0">
-          <button
-            onClick={() => setShowLogger(false)}
-            className="absolute top-3 right-3 z-10 p-1.5 bg-gray-100 hover:bg-gray-200 rounded-full"
-          >
-            <X className="w-4 h-4 text-gray-600" />
-          </button>
-          <div className="p-2 max-h-[70vh] overflow-y-auto">
-            <ExpenseLogger
-              onSave={onSaveExpense}
-              onUploadReceipt={onUploadReceipt}
-              budgetItems={budgetItems}
-              appMode={appMode}
-              activePlan={activePlan}
-              onModeChange={onModeChange}
-            />
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowLogger(true)}
-          className={`w-full p-4 rounded-xl shadow-md flex items-center justify-center gap-2 text-lg font-bold transition-all ${appMode === 'yearly'
-            ? 'bg-purple-600 hover:bg-purple-700 text-white'
-            : 'bg-emerald-500 hover:bg-emerald-600 text-white'
-            }`}
-        >
-          <Camera className="w-6 h-6" />
-          {appMode === 'yearly' && activePlanDetails ? `Log to ${activePlanDetails.name}` : "Input Expense"}
-        </button>
       )}
 
       {/* Stats Cards - Fixed Layout */}

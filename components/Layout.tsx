@@ -4,15 +4,14 @@ import { User as UserType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
-  onOpenLogger?: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh, user, onLogout, onOpenLogger }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh, user, onLogout }) => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   // Pull to refresh state
@@ -209,7 +208,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
           {/* FAB - Add Receipt */}
           <button
-            onClick={onOpenLogger}
+            onClick={() => setActiveTab('input')}
             className="absolute left-1/2 -translate-x-1/2 -top-6 w-14 h-14 bg-indigo-600 rounded-full flex items-center justify-center shadow-lg hover:bg-indigo-700 transition-colors"
           >
             <Plus className="w-7 h-7 text-white" />
