@@ -244,7 +244,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {/* Balance Card with rotating landscape background */}
       <div
-        className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden"
+        className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden min-h-[160px]"
         style={{
           backgroundImage: `url(${getRandomBackgroundImage()})`,
           backgroundSize: 'cover',
