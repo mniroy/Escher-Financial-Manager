@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem, User } from '../types';
 import { Calendar, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart, ArrowUp, ArrowDown } from 'lucide-react';
@@ -42,6 +42,19 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedAnnualPlan, setSelectedAnnualPlan] = useState<string | null>(null);
+
+  // Get list of yearly budget items for the plan selector
+  const yearlyItems = useMemo(() => {
+    return budgetItems.filter(item => item.frequency === 'Yearly');
+  }, [budgetItems]);
+
+  // Auto-select first annual plan when switching to yearly-only mode
+  useEffect(() => {
+    if (viewMode === 'yearly-only' && yearlyItems.length > 0 && !selectedAnnualPlan) {
+      setSelectedAnnualPlan(yearlyItems[0].name);
+    }
+  }, [viewMode, yearlyItems, selectedAnnualPlan]);
 
   // Get greeting based on time of day
   const greeting = useMemo(() => {
@@ -298,6 +311,26 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
+      {/* Annual Plan Selector - Only show in yearly-only mode */}
+      {viewMode === 'yearly-only' && yearlyItems.length > 0 && (
+        <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-2">
+            <Plane className="w-4 h-4 text-purple-600" />
+            <select
+              value={selectedAnnualPlan || ''}
+              onChange={(e) => setSelectedAnnualPlan(e.target.value)}
+              className="flex-1 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm font-medium text-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              {yearlyItems.map(item => (
+                <option key={item.name} value={item.name}>
+                  {item.name} - {formatCurrency(item.amount)}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
       {/* Balance Card with rotating landscape background */}
       <div
         className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden min-h-[160px]"
@@ -385,84 +418,145 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Main Chart - Compact Progress Bar Style */}
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Spending vs Budget</h3>
-        <div className="space-y-3">
-          {chartData.length > 0 ? (
-            chartData.map((item, index) => {
-              const percentage = item.budget > 0 ? Math.min((item.spent / item.budget) * 100, 150) : 0;
-              const displayPercentage = item.budget > 0 ? (item.spent / item.budget) * 100 : 0;
-              const isOverBudget = displayPercentage > 100;
-              const isNearBudget = displayPercentage >= 80 && displayPercentage <= 100;
+      {/* Main Content - Different view for yearly-only vs other modes */}
+      {viewMode === 'yearly-only' && selectedAnnualPlan ? (
+        // Annual Events - Show budget summary and transaction list for selected plan
+        (() => {
+          const selectedBudgetItem = yearlyItems.find(item => item.name === selectedAnnualPlan);
+          const planExpenses = filteredExpenses.filter(e => e.budgetItemName === selectedAnnualPlan);
+          const totalSpentOnPlan = planExpenses.reduce((sum, e) => sum + e.amount, 0);
+          const budget = selectedBudgetItem?.amount || 0;
+          const remaining = budget - totalSpentOnPlan;
+          const percentage = budget > 0 ? (totalSpentOnPlan / budget) * 100 : 0;
+          const isOverBudget = percentage > 100;
+          const isNearBudget = percentage >= 80 && percentage <= 100;
 
-              // Color based on budget status
-              const barColor = isOverBudget
-                ? 'bg-red-500'
-                : isNearBudget
-                  ? 'bg-amber-500'
-                  : 'bg-emerald-500';
+          const barColor = isOverBudget ? 'bg-red-500' : isNearBudget ? 'bg-amber-500' : 'bg-emerald-500';
+          const textColor = isOverBudget ? 'text-red-600' : isNearBudget ? 'text-amber-600' : 'text-emerald-600';
 
-              const textColor = isOverBudget
-                ? 'text-red-600'
-                : isNearBudget
-                  ? 'text-amber-600'
-                  : 'text-emerald-600';
+          return (
+            <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+              {/* Plan Budget Summary */}
+              <div className="mb-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">{selectedAnnualPlan} Budget</h3>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className={`font-bold ${textColor}`}>{formatCurrency(totalSpentOnPlan)}</span>
+                  <span className="text-gray-400">of</span>
+                  <span className="text-gray-600 font-medium">{formatCurrency(budget)}</span>
+                  <span className={`font-bold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                    {remaining >= 0 ? '+' : ''}{formatCurrency(remaining)} remaining
+                  </span>
+                </div>
+                <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className={`absolute left-0 top-0 h-full ${barColor} rounded-full transition-all duration-300`}
+                    style={{ width: `${Math.min(percentage, 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-end mt-1">
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${isOverBudget ? 'bg-red-100 text-red-700' : isNearBudget ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                    {percentage.toFixed(0)}% used
+                  </span>
+                </div>
+              </div>
 
-              return (
-                <div key={index} className="space-y-1">
-                  {/* Category name and amounts */}
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-gray-700 truncate max-w-[120px]" title={item.category}>
-                      {item.category}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span className={`font-semibold ${textColor}`}>
-                        {formatCurrency(item.spent)}
+              {/* Transaction List */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  Transactions ({planExpenses.length})
+                </h4>
+                {planExpenses.length > 0 ? (
+                  <div className="space-y-2">
+                    {planExpenses
+                      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                      .map((expense, idx) => (
+                        <div key={expense.id || idx} className="flex items-center justify-between py-2 px-3 bg-gray-50 rounded-lg">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">
+                              {expense.description || expense.category}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {new Date(expense.date).toLocaleDateString('en-US', {
+                                month: 'short', day: 'numeric', year: 'numeric'
+                              })}
+                            </p>
+                          </div>
+                          <span className="text-sm font-bold text-gray-800 ml-2">
+                            {formatCurrency(expense.amount)}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-400">
+                    <Receipt className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm">No transactions yet</p>
+                    <p className="text-xs">Add expenses linked to this plan</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()
+      ) : (
+        // Monthly/Yearly - Show category progress bars
+        <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+          <h3 className="text-sm font-semibold text-gray-700 mb-3">Spending vs Budget</h3>
+          <div className="space-y-3">
+            {chartData.length > 0 ? (
+              chartData.map((item, index) => {
+                const percentage = item.budget > 0 ? Math.min((item.spent / item.budget) * 100, 150) : 0;
+                const displayPercentage = item.budget > 0 ? (item.spent / item.budget) * 100 : 0;
+                const isOverBudget = displayPercentage > 100;
+                const isNearBudget = displayPercentage >= 80 && displayPercentage <= 100;
+
+                const barColor = isOverBudget ? 'bg-red-500' : isNearBudget ? 'bg-amber-500' : 'bg-emerald-500';
+                const textColor = isOverBudget ? 'text-red-600' : isNearBudget ? 'text-amber-600' : 'text-emerald-600';
+
+                return (
+                  <div key={index} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-medium text-gray-700 truncate max-w-[120px]" title={item.category}>
+                        {item.category}
                       </span>
-                      <span className="text-gray-400">/</span>
-                      <span className="text-gray-500">{formatCurrency(item.budget)}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`font-semibold ${textColor}`}>{formatCurrency(item.spent)}</span>
+                        <span className="text-gray-400">/</span>
+                        <span className="text-gray-500">{formatCurrency(item.budget)}</span>
+                      </div>
+                    </div>
+                    <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute left-0 top-0 h-full ${barColor} rounded-full transition-all duration-300`}
+                        style={{ width: `${Math.min(percentage, 100)}%` }}
+                      />
+                      {isOverBudget && (
+                        <div
+                          className="absolute right-0 top-0 h-full bg-red-200 rounded-r-full"
+                          style={{ width: `${Math.min(percentage - 100, 50)}%` }}
+                        />
+                      )}
+                    </div>
+                    <div className="flex justify-end">
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${isOverBudget ? 'bg-red-100 text-red-700' : isNearBudget ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                        {displayPercentage.toFixed(0)}%
+                      </span>
                     </div>
                   </div>
-
-                  {/* Progress bar */}
-                  <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`absolute left-0 top-0 h-full ${barColor} rounded-full transition-all duration-300`}
-                      style={{ width: `${Math.min(percentage, 100)}%` }}
-                    />
-                    {/* Overspend indicator */}
-                    {isOverBudget && (
-                      <div
-                        className="absolute right-0 top-0 h-full bg-red-200 rounded-r-full"
-                        style={{ width: `${Math.min(percentage - 100, 50)}%` }}
-                      />
-                    )}
-                  </div>
-
-                  {/* Percentage badge */}
-                  <div className="flex justify-end">
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${isOverBudget
-                      ? 'bg-red-100 text-red-700'
-                      : isNearBudget
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-emerald-100 text-emerald-700'
-                      }`}>
-                      {displayPercentage.toFixed(0)}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-1">
-              <TrendingUp className="w-10 h-10 opacity-20" />
-              <p className="font-medium text-sm">No budget data</p>
-              <p className="text-xs">Configure in Settings</p>
-            </div>
-          )}
+                );
+              })
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-1">
+                <TrendingUp className="w-10 h-10 opacity-20" />
+                <p className="font-medium text-sm">No budget data</p>
+                <p className="text-xs">Configure in Settings</p>
+              </div>
+            )}
+          </div>
         </div>
-      </div >
+      )}
     </div >
   );
 };
