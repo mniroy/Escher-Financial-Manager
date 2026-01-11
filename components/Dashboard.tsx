@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
-import { Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard } from 'lucide-react';
+import { Calendar, TrendingUp, ChevronLeft, ChevronRight, Camera, X, Plane, CreditCard, Receipt, DollarSign, CalendarDays, BarChart3, Tag, PieChart } from 'lucide-react';
 import ExpenseLogger from './ExpenseLogger';
 
 interface DashboardProps {
@@ -138,8 +138,57 @@ const Dashboard: React.FC<DashboardProps> = ({
   const totalBudget = chartData.reduce((acc, curr) => acc + curr.budget, 0);
   const totalRemaining = totalBudget - totalSpent;
 
+  // Calculate This Month's Stats from actual spending
+  const monthlyStats = useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    // Filter expenses for current month
+    const thisMonthExpenses = expenses.filter(e => {
+      const d = new Date(e.date);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+    });
+
+    const totalReceipts = thisMonthExpenses.length;
+    const totalSpentThisMonth = thisMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // Days passed in current month
+    const dayOfMonth = now.getDate();
+    const avgDailySpend = dayOfMonth > 0 ? totalSpentThisMonth / dayOfMonth : 0;
+
+    // Average monthly spend (based on all expenses)
+    const allMonths = new Set(expenses.map(e => {
+      const d = new Date(e.date);
+      return `${d.getFullYear()}-${d.getMonth()}`;
+    }));
+    const monthCount = Math.max(allMonths.size, 1);
+    const avgMonthlySpend = expenses.reduce((sum, e) => sum + e.amount, 0) / monthCount;
+
+    // Top category for this month (based on actual spending)
+    const categoryTotals: Record<string, number> = {};
+    thisMonthExpenses.forEach(e => {
+      categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
+    });
+
+    const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+    const topCategoryName = topCategory ? topCategory[0] : '-';
+    const topCategoryPercent = topCategory && totalSpentThisMonth > 0
+      ? (topCategory[1] / totalSpentThisMonth) * 100
+      : 0;
+
+    return {
+      totalReceipts,
+      totalSpentThisMonth,
+      avgDailySpend,
+      avgMonthlySpend,
+      topCategoryName,
+      topCategoryPercent
+    };
+  }, [expenses]);
+
   return (
-    <div className={`flex flex-col gap-3 p-3 h-full overscroll-none ${showLogger ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+    <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto overscroll-none">
 
       {/* Mode Selector - Compact */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
@@ -263,6 +312,70 @@ const Dashboard: React.FC<DashboardProps> = ({
             <p className={`text-sm sm:text-lg font-bold ${totalRemaining < 0 ? 'text-red-600' : 'text-gray-800'}`}>
               {formatCurrency(totalRemaining)}
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* This Month's Stats - Colorful Grid */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <TrendingUp className="w-5 h-5 text-emerald-500" />
+          <h3 className="text-base font-bold text-gray-800">This Month's Stats</h3>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Total Receipts */}
+          <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
+            <div className="flex items-center gap-2 mb-1">
+              <Receipt className="w-4 h-4 text-emerald-600" />
+              <span className="text-xs font-medium text-emerald-700">Total Receipts</span>
+            </div>
+            <p className="text-2xl font-bold text-emerald-600">{monthlyStats.totalReceipts}</p>
+          </div>
+
+          {/* Total Spent */}
+          <div className="bg-cyan-50 rounded-xl p-3 border border-cyan-100">
+            <div className="flex items-center gap-2 mb-1">
+              <DollarSign className="w-4 h-4 text-cyan-600" />
+              <span className="text-xs font-medium text-cyan-700">Total Spent</span>
+            </div>
+            <p className="text-xl font-bold text-cyan-600">{formatCurrency(monthlyStats.totalSpentThisMonth)}</p>
+          </div>
+
+          {/* Avg Daily Spend */}
+          <div className="bg-amber-50 rounded-xl p-3 border border-amber-100">
+            <div className="flex items-center gap-2 mb-1">
+              <CalendarDays className="w-4 h-4 text-amber-600" />
+              <span className="text-xs font-medium text-amber-700">Avg. Daily Spend</span>
+            </div>
+            <p className="text-xl font-bold text-amber-600">{formatCurrency(monthlyStats.avgDailySpend)}</p>
+          </div>
+
+          {/* Avg Monthly Spend */}
+          <div className="bg-purple-50 rounded-xl p-3 border border-purple-100">
+            <div className="flex items-center gap-2 mb-1">
+              <BarChart3 className="w-4 h-4 text-purple-600" />
+              <span className="text-xs font-medium text-purple-700">Avg. Monthly Spe...</span>
+            </div>
+            <p className="text-xl font-bold text-purple-600">{formatCurrency(monthlyStats.avgMonthlySpend)}</p>
+          </div>
+
+          {/* Top Category */}
+          <div className="bg-violet-50 rounded-xl p-3 border border-violet-100">
+            <div className="flex items-center gap-2 mb-1">
+              <Tag className="w-4 h-4 text-violet-600" />
+              <span className="text-xs font-medium text-violet-700">Top Category</span>
+            </div>
+            <p className="text-lg font-bold text-violet-600 truncate lowercase">{monthlyStats.topCategoryName}</p>
+          </div>
+
+          {/* Top Category % */}
+          <div className="bg-rose-50 rounded-xl p-3 border border-rose-100">
+            <div className="flex items-center gap-2 mb-1">
+              <PieChart className="w-4 h-4 text-rose-500" />
+              <span className="text-xs font-medium text-rose-600">Top Cat. %</span>
+            </div>
+            <p className="text-2xl font-bold text-rose-500">{monthlyStats.topCategoryPercent.toFixed(1)}%</p>
           </div>
         </div>
       </div>
