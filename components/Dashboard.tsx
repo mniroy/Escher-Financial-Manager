@@ -4,30 +4,38 @@ import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem, User } from '../types';
 import { Calendar, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart, ArrowUp, ArrowDown } from 'lucide-react';
 
-// Search terms for rotating landscape backgrounds - cycles daily
-const LANDSCAPE_SEARCH_TERMS = [
-  'bali-rice-terrace-landscape',
-  'vietnam-landscape-nature',
-  'china-mountains-landscape',
-  'yogyakarta-temple-landscape',
+// Royalty-free landscape photos from Unsplash - direct CDN links for reliability
+const LANDSCAPE_BACKGROUNDS = [
+  // Bali, Indonesia - rice terraces
+  'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1555400038-63f5ba517a47?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1604999333679-b86d54738315?w=800&h=600&fit=crop&q=80',
+  // Vietnam - Ha Long Bay & landscapes
+  'https://images.unsplash.com/photo-1528127269322-539801943592?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1583417319070-4a69db38a482?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1557750255-c76072a7aad1?w=800&h=600&fit=crop&q=80',
+  // China - mountains & landscapes
+  'https://images.unsplash.com/photo-1513415564515-763d91423bdd?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1508804185872-d7badad00f7d?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1547981609-4b6bfe67ca0b?w=800&h=600&fit=crop&q=80',
+  // Yogyakarta, Indonesia - Borobudur & Prambanan
+  'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1588668214407-6ea9a6d8c272?w=800&h=600&fit=crop&q=80',
+  'https://images.unsplash.com/photo-1565967511849-76a60a516170?w=800&h=600&fit=crop&q=80',
 ];
 
-// Get a random landscape background that changes daily
+// Get the background image that rotates once per day
 const getDailyBackgroundImage = (): string => {
   const now = new Date();
-  // Use day of year to determine which search term and seed to use
+  // Use day of year to determine which image to show
   const startOfYear = new Date(now.getFullYear(), 0, 0);
   const diff = now.getTime() - startOfYear.getTime();
   const oneDay = 1000 * 60 * 60 * 24;
   const dayOfYear = Math.floor(diff / oneDay);
 
-  // Rotate through different search terms
-  const searchIndex = dayOfYear % LANDSCAPE_SEARCH_TERMS.length;
-  const searchTerm = LANDSCAPE_SEARCH_TERMS[searchIndex];
-
-  // Use Unsplash Source API with a daily seed for random but consistent daily images
-  // The sig parameter ensures we get a different image each day
-  return `https://source.unsplash.com/800x600/?${searchTerm}&sig=${dayOfYear}`;
+  // Cycle through 12 images - each image shows for one day
+  const imageIndex = dayOfYear % LANDSCAPE_BACKGROUNDS.length;
+  return LANDSCAPE_BACKGROUNDS[imageIndex];
 };
 
 interface DashboardProps {
