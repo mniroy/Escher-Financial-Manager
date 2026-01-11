@@ -4,6 +4,32 @@ import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem, User } from '../types';
 import { Calendar, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart, ArrowUp, ArrowDown } from 'lucide-react';
 
+// Search terms for rotating landscape backgrounds - cycles daily
+const LANDSCAPE_SEARCH_TERMS = [
+  'bali-rice-terrace-landscape',
+  'vietnam-landscape-nature',
+  'china-mountains-landscape',
+  'yogyakarta-temple-landscape',
+];
+
+// Get a random landscape background that changes daily
+const getDailyBackgroundImage = (): string => {
+  const now = new Date();
+  // Use day of year to determine which search term and seed to use
+  const startOfYear = new Date(now.getFullYear(), 0, 0);
+  const diff = now.getTime() - startOfYear.getTime();
+  const oneDay = 1000 * 60 * 60 * 24;
+  const dayOfYear = Math.floor(diff / oneDay);
+
+  // Rotate through different search terms
+  const searchIndex = dayOfYear % LANDSCAPE_SEARCH_TERMS.length;
+  const searchTerm = LANDSCAPE_SEARCH_TERMS[searchIndex];
+
+  // Use Unsplash Source API with a daily seed for random but consistent daily images
+  // The sig parameter ensures we get a different image each day
+  return `https://source.unsplash.com/800x600/?${searchTerm}&sig=${dayOfYear}`;
+};
+
 interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
@@ -199,29 +225,42 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Balance Card */}
-      <div className="bg-gradient-to-br from-indigo-500 via-indigo-600 to-purple-600 rounded-2xl p-5 text-white shadow-lg">
-        <div className="text-center mb-4">
-          <p className="text-indigo-200 text-sm mb-1">Left</p>
-          <p className={`text-3xl font-bold ${totalRemaining < 0 ? 'text-red-300' : 'text-white'}`}>
-            {formatCurrency(totalRemaining)}
-          </p>
-        </div>
+      {/* Balance Card with rotating landscape background */}
+      <div
+        className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden"
+        style={{
+          backgroundImage: `url(${getDailyBackgroundImage()})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
+        {/* Dark overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/60" />
 
-        <div className="flex justify-around pt-4 border-t border-white/20">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <ArrowUp className="w-4 h-4 text-emerald-300" />
-              <span className="text-xs text-indigo-200">Budget</span>
-            </div>
-            <p className="text-lg font-semibold">{formatCurrency(totalBudget)}</p>
+        {/* Content */}
+        <div className="relative z-10">
+          <div className="text-center mb-4">
+            <p className="text-white/80 text-sm mb-1">Left</p>
+            <p className={`text-3xl font-bold ${totalRemaining < 0 ? 'text-red-300' : 'text-white'}`}>
+              {formatCurrency(totalRemaining)}
+            </p>
           </div>
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <ArrowDown className="w-4 h-4 text-red-300" />
-              <span className="text-xs text-indigo-200">Spent</span>
+
+          <div className="flex justify-around pt-4 border-t border-white/20">
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <ArrowUp className="w-4 h-4 text-emerald-300" />
+                <span className="text-xs text-white/80">Budget</span>
+              </div>
+              <p className="text-lg font-semibold">{formatCurrency(totalBudget)}</p>
             </div>
-            <p className="text-lg font-semibold">{formatCurrency(totalSpent)}</p>
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <ArrowDown className="w-4 h-4 text-red-300" />
+                <span className="text-xs text-white/80">Spent</span>
+              </div>
+              <p className="text-lg font-semibold">{formatCurrency(totalSpent)}</p>
+            </div>
           </div>
         </div>
       </div>
