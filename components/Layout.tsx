@@ -25,7 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
   const [swipeStartY, setSwipeStartY] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
 
-  const tabs: Array<'dashboard' | 'transactions' | 'chat' | 'budget'> = ['dashboard', 'transactions', 'chat', 'budget'];
+  const tabs: Array<'dashboard' | 'transactions' | 'chat' | 'budget'> = ['dashboard', 'transactions', 'budget', 'chat'];
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
