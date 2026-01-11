@@ -294,9 +294,6 @@ export default function App() {
         <Dashboard
           expenses={expenses}
           budgetItems={budgetItems}
-          appMode={appMode}
-          activePlan={activePlan}
-          onModeChange={handleModeChange}
         />
       )}
       {activeTab === 'input' && (

@@ -2,37 +2,22 @@ import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
-import { Calendar, TrendingUp, ChevronLeft, ChevronRight, X, Plane, CreditCard, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart } from 'lucide-react';
+import { Calendar, TrendingUp, ChevronLeft, ChevronRight, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart } from 'lucide-react';
 
 interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
-  appMode: 'standard' | 'yearly';
-  activePlan: string;
-  onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
   expenses,
-  budgetItems,
-  appMode,
-  activePlan,
-  onModeChange
+  budgetItems
 }) => {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();
-
-  // Filter only Yearly items for the dropdown
-  const yearlyBudgetItems = useMemo(() => {
-    return budgetItems.filter(item => item.frequency === 'Yearly');
-  }, [budgetItems]);
-
-  const activePlanDetails = useMemo(() => {
-    return yearlyBudgetItems.find(i => i.name === activePlan);
-  }, [activePlan, yearlyBudgetItems]);
 
   // Navigation handlers
   const handlePrev = () => {
@@ -183,79 +168,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto overscroll-none">
-
-      {/* Mode Selector - Compact */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
-        <div className="flex gap-2">
-          {/* Standard Mode */}
-          <button
-            onClick={() => onModeChange('standard', '')}
-            className={`flex-1 p-3 rounded-lg border-2 transition-all ${appMode === 'standard'
-              ? 'border-indigo-500 bg-indigo-50'
-              : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-              }`}
-          >
-            <div className="flex items-center gap-2">
-              <CreditCard className={`w-5 h-5 ${appMode === 'standard' ? 'text-indigo-600' : 'text-gray-400'}`} />
-              <div className="text-left">
-                <div className={`text-sm font-semibold ${appMode === 'standard' ? 'text-indigo-900' : 'text-gray-600'}`}>Standard</div>
-                <div className="text-[10px] text-gray-400">Daily spending</div>
-              </div>
-            </div>
-          </button>
-
-          {/* Yearly Mode */}
-          <button
-            onClick={() => {
-              if (appMode !== 'yearly') {
-                const defaultPlan = yearlyBudgetItems[0]?.name || '';
-                onModeChange('yearly', defaultPlan);
-              }
-            }}
-            className={`flex-1 p-3 rounded-lg border-2 transition-all ${appMode === 'yearly'
-              ? 'border-purple-500 bg-purple-50'
-              : 'border-gray-100 bg-gray-50 hover:border-gray-200'
-              }`}
-          >
-            <div className="flex items-center gap-2">
-              <Plane className={`w-5 h-5 ${appMode === 'yearly' ? 'text-purple-600' : 'text-gray-400'}`} />
-              <div className="text-left">
-                <div className={`text-sm font-semibold ${appMode === 'yearly' ? 'text-purple-900' : 'text-gray-600'}`}>Annual</div>
-                <div className="text-[10px] text-gray-400">Events mode</div>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* Yearly Plan Dropdown */}
-        {appMode === 'yearly' && (
-          <div className="mt-2 pt-2 border-t border-gray-100">
-            <select
-              value={activePlan}
-              onChange={(e) => onModeChange('yearly', e.target.value)}
-              className="w-full rounded-lg border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2 px-3 bg-white text-purple-900 font-medium text-sm"
-            >
-              <option value="">-- Select Plan --</option>
-              {yearlyBudgetItems.map((item, idx) => (
-                <option key={idx} value={item.name}>{item.name} ({formatCurrency(item.amount)})</option>
-              ))}
-            </select>
-          </div>
-        )}
-      </div>
-
-      {/* Active Mode Banner */}
-      {appMode === 'yearly' && activePlanDetails && (
-        <div className="bg-purple-600 text-white px-3 py-2 rounded-lg flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm">
-            <Plane className="w-4 h-4" />
-            <span>Logging to: <strong>{activePlanDetails.name}</strong></span>
-          </div>
-          <button onClick={() => onModeChange('standard', '')} className="p-1 hover:bg-white/20 rounded">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Stats Cards - Fixed Layout */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
