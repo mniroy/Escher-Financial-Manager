@@ -48,7 +48,13 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
         // Scroll to bottom when keyboard opens
         if (newKeyboardHeight > 0) {
-          setTimeout(() => scrollToBottom(), 100);
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 150);
+          // Follow-up scroll to catch any layout shifts
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 400);
         }
       }
     };
