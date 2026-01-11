@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem, User } from '../types';
 import { Calendar, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart, ArrowUp, ArrowDown } from 'lucide-react';
@@ -391,36 +390,75 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Main Chart - Compact */}
-      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex-1 min-h-0">
-        <h3 className="text-sm font-semibold text-gray-700 mb-2">Spending vs Budget</h3>
-        <div className="h-[200px] sm:h-[280px] w-full">
+      {/* Main Chart - Compact Progress Bar Style */}
+      <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex-1 min-h-0 overflow-hidden">
+        <h3 className="text-sm font-semibold text-gray-700 mb-3">Spending vs Budget</h3>
+        <div className="h-[200px] sm:h-[280px] overflow-y-auto space-y-3 pr-1">
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                layout="vertical"
-                margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f0f0f0" />
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="category"
-                  width={70}
-                  tick={{ fontSize: 9, fill: '#6b7280' }}
-                  interval={0}
-                />
-                <Tooltip
-                  formatter={(value: number) => formatCurrency(value)}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-                  cursor={{ fill: '#f9fafb' }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px', fontSize: '10px' }} />
-                <Bar dataKey="budget" name="Budget" fill="#10b981" radius={[0, 4, 4, 0]} barSize={12} />
-                <Bar dataKey="spent" name="Spent" fill="#1f2937" radius={[0, 4, 4, 0]} barSize={12} />
-              </BarChart>
-            </ResponsiveContainer>
+            chartData.map((item, index) => {
+              const percentage = item.budget > 0 ? Math.min((item.spent / item.budget) * 100, 150) : 0;
+              const displayPercentage = item.budget > 0 ? (item.spent / item.budget) * 100 : 0;
+              const isOverBudget = displayPercentage > 100;
+              const isNearBudget = displayPercentage >= 80 && displayPercentage <= 100;
+
+              // Color based on budget status
+              const barColor = isOverBudget
+                ? 'bg-red-500'
+                : isNearBudget
+                  ? 'bg-amber-500'
+                  : 'bg-emerald-500';
+
+              const textColor = isOverBudget
+                ? 'text-red-600'
+                : isNearBudget
+                  ? 'text-amber-600'
+                  : 'text-emerald-600';
+
+              return (
+                <div key={index} className="space-y-1">
+                  {/* Category name and amounts */}
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium text-gray-700 truncate max-w-[120px]" title={item.category}>
+                      {item.category}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`font-semibold ${textColor}`}>
+                        {formatCurrency(item.spent)}
+                      </span>
+                      <span className="text-gray-400">/</span>
+                      <span className="text-gray-500">{formatCurrency(item.budget)}</span>
+                    </div>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className={`absolute left-0 top-0 h-full ${barColor} rounded-full transition-all duration-300`}
+                      style={{ width: `${Math.min(percentage, 100)}%` }}
+                    />
+                    {/* Overspend indicator */}
+                    {isOverBudget && (
+                      <div
+                        className="absolute right-0 top-0 h-full bg-red-200 rounded-r-full"
+                        style={{ width: `${Math.min(percentage - 100, 50)}%` }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Percentage badge */}
+                  <div className="flex justify-end">
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${isOverBudget
+                      ? 'bg-red-100 text-red-700'
+                      : isNearBudget
+                        ? 'bg-amber-100 text-amber-700'
+                        : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                      {displayPercentage.toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              );
+            })
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-gray-400 space-y-1">
               <TrendingUp className="w-10 h-10 opacity-20" />
