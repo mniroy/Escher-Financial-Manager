@@ -26,16 +26,10 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
     budgetItems = [],
     appMode,
     activePlan,
-    onModeChange
 }) => {
     const [tasks, setTasks] = useState<LogTask[]>([]);
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
-
-    // Filter only Yearly items for the dropdown
-    const yearlyBudgetItems = useMemo(() => {
-        return budgetItems.filter(item => item.frequency === 'Yearly');
-    }, [budgetItems]);
 
     // Derived active plan based on global props
     const activeYearlyPlan = useMemo(() => {
@@ -135,66 +129,6 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
 
     return (
         <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-
-            {/* Mode Selector */}
-            <div className="p-4 bg-gray-50 border-b border-gray-200">
-                <div className="flex gap-2">
-                    {/* Standard Mode */}
-                    <button
-                        onClick={() => onModeChange('standard', '')}
-                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${appMode === 'standard'
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                            }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <CreditCard className={`w-5 h-5 ${appMode === 'standard' ? 'text-indigo-600' : 'text-gray-400'}`} />
-                            <div className="text-left">
-                                <div className={`text-sm font-semibold ${appMode === 'standard' ? 'text-indigo-900' : 'text-gray-600'}`}>Standard</div>
-                                <div className="text-[10px] text-gray-400">Daily spending</div>
-                            </div>
-                        </div>
-                    </button>
-
-                    {/* Yearly Mode */}
-                    <button
-                        onClick={() => {
-                            if (appMode !== 'yearly') {
-                                const defaultPlan = yearlyBudgetItems[0]?.name || '';
-                                onModeChange('yearly', defaultPlan);
-                            }
-                        }}
-                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${appMode === 'yearly'
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                            }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Plane className={`w-5 h-5 ${appMode === 'yearly' ? 'text-purple-600' : 'text-gray-400'}`} />
-                            <div className="text-left">
-                                <div className={`text-sm font-semibold ${appMode === 'yearly' ? 'text-purple-900' : 'text-gray-600'}`}>Annual</div>
-                                <div className="text-[10px] text-gray-400">Events mode</div>
-                            </div>
-                        </div>
-                    </button>
-                </div>
-
-                {/* Yearly Plan Dropdown */}
-                {appMode === 'yearly' && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                        <select
-                            value={activePlan}
-                            onChange={(e) => onModeChange('yearly', e.target.value)}
-                            className="w-full rounded-lg border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2 px-3 bg-white text-purple-900 font-medium text-sm"
-                        >
-                            <option value="">-- Select Plan --</option>
-                            {yearlyBudgetItems.map((item, idx) => (
-                                <option key={idx} value={item.name}>{item.name} ({formatCurrency(item.amount)})</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
-            </div>
 
             {/* Context Banner */}
             <div className={`p-4 border-b ${appMode === 'yearly' ? 'bg-purple-50 border-purple-100' : 'bg-indigo-50 border-indigo-100'
