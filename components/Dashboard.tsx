@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from 'recharts';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem } from '../types';
@@ -13,6 +13,8 @@ interface DashboardProps {
   appMode: 'standard' | 'yearly';
   activePlan: string;
   onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;
+  forceShowLogger?: boolean;
+  onLoggerClose?: () => void;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -22,11 +24,20 @@ const Dashboard: React.FC<DashboardProps> = ({
   onUploadReceipt,
   appMode,
   activePlan,
-  onModeChange
+  onModeChange,
+  forceShowLogger,
+  onLoggerClose
 }) => {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showLogger, setShowLogger] = useState(false);
+
+  // Sync with forceShowLogger prop
+  useEffect(() => {
+    if (forceShowLogger) {
+      setShowLogger(true);
+    }
+  }, [forceShowLogger]);
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();

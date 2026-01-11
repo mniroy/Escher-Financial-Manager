@@ -22,6 +22,7 @@ export default function App() {
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [showLoggerFromFab, setShowLoggerFromFab] = useState(false);
 
   // Global App Mode State (Persistent)
   const [appMode, setAppMode] = useState<'standard' | 'yearly'>('standard');
@@ -289,6 +290,10 @@ export default function App() {
       onRefresh={() => loadData(user)}
       user={user}
       onLogout={handleLogout}
+      onOpenLogger={() => {
+        setActiveTab('dashboard');
+        setShowLoggerFromFab(true);
+      }}
     >
       {activeTab === 'dashboard' && (
         <Dashboard
@@ -302,6 +307,8 @@ export default function App() {
           appMode={appMode}
           activePlan={activePlan}
           onModeChange={handleModeChange}
+          forceShowLogger={showLoggerFromFab}
+          onLoggerClose={() => setShowLoggerFromFab(false)}
         />
       )}
       {activeTab === 'transactions' && (
