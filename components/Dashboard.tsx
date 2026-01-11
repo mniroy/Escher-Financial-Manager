@@ -399,7 +399,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
         <div className="flex items-center gap-2 mb-2">
           <TrendingUp className="w-4 h-4 text-emerald-500" />
-          <h3 className="text-sm font-bold text-gray-800">{dateLabel} Stats</h3>
+          <h3 className="text-sm font-bold text-gray-800">
+            {viewMode === 'yearly-only' && selectedAnnualPlan ? selectedAnnualPlan : dateLabel}
+          </h3>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
