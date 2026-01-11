@@ -105,7 +105,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       const yearMatch = d.getFullYear() === displayedYear;
 
       if (viewMode === 'monthly') {
-        return d.getMonth() === displayedMonth && yearMatch;
+        // Exclude expenses linked to yearly budget items in monthly view
+        const isYearlyExpense = e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
+        return d.getMonth() === displayedMonth && yearMatch && !isYearlyExpense;
       } else if (viewMode === 'yearly-only') {
         // Only include expenses tied to yearly budget items
         return yearMatch && e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
@@ -117,6 +119,23 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   // Calculate Chart Data based on view mode and current budgetItems
   const chartData = useMemo(() => {
+    if (viewMode === 'yearly-only') {
+      // In yearly-only mode, show individual yearly budget items by name
+      const yearlyItems = budgetItems.filter(item => item.frequency === 'Yearly');
+      return yearlyItems.map(item => {
+        const spent = filteredExpenses
+          .filter(e => e.budgetItemName === item.name)
+          .reduce((sum, e) => sum + e.amount, 0);
+        return {
+          category: item.name, // Show plan name like "Vacation Bali"
+          budget: item.amount,
+          spent,
+          remaining: item.amount - spent
+        };
+      }).filter(item => item.budget > 0 || item.spent > 0);
+    }
+
+    // For monthly and yearly views, use category-based summary
     const budgetSummary = calculateBudgetSummary(budgetItems);
 
     return budgetSummary.map(row => {
@@ -124,14 +143,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       let spent = 0;
 
       if (viewMode === 'monthly') {
-        // In monthly mode, we only care about monthly allocations
+        // In monthly mode, only show monthly allocations (yearly is handled separately)
         budget = row.monthlyAllocation;
-        spent = filteredExpenses
-          .filter(e => e.category === row.category)
-          .reduce((sum, e) => sum + e.amount, 0);
-      } else if (viewMode === 'yearly-only') {
-        // In yearly-only mode, show only yearly allocations (one-time annual expenses)
-        budget = row.yearlyAllocation;
         spent = filteredExpenses
           .filter(e => e.category === row.category)
           .reduce((sum, e) => sum + e.amount, 0);
@@ -156,16 +169,17 @@ const Dashboard: React.FC<DashboardProps> = ({
   const totalBudget = chartData.reduce((acc, curr) => acc + curr.budget, 0);
   const totalRemaining = totalBudget - totalSpent;
 
-  // Calculate This Month's Stats from actual spending
+  // Calculate This Month's Stats from actual spending (excluding yearly expenses)
   const monthlyStats = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
 
-    // Filter expenses for current month
+    // Filter expenses for current month, excluding yearly budget items
     const thisMonthExpenses = expenses.filter(e => {
       const d = new Date(e.date);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      const isYearlyExpense = e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear && !isYearlyExpense;
     });
 
     const totalReceipts = thisMonthExpenses.length;
@@ -175,15 +189,19 @@ const Dashboard: React.FC<DashboardProps> = ({
     const dayOfMonth = now.getDate();
     const avgDailySpend = dayOfMonth > 0 ? totalSpentThisMonth / dayOfMonth : 0;
 
-    // Average monthly spend (based on all expenses)
-    const allMonths = new Set(expenses.map(e => {
+    // Average monthly spend (based on non-yearly expenses only)
+    const nonYearlyExpenses = expenses.filter(e => {
+      const isYearlyExpense = e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
+      return !isYearlyExpense;
+    });
+    const allMonths = new Set(nonYearlyExpenses.map(e => {
       const d = new Date(e.date);
       return `${d.getFullYear()}-${d.getMonth()}`;
     }));
     const monthCount = Math.max(allMonths.size, 1);
-    const avgMonthlySpend = expenses.reduce((sum, e) => sum + e.amount, 0) / monthCount;
+    const avgMonthlySpend = nonYearlyExpenses.reduce((sum, e) => sum + e.amount, 0) / monthCount;
 
-    // Top category for this month (based on actual spending)
+    // Top category for this month (based on actual spending, excluding yearly)
     const categoryTotals: Record<string, number> = {};
     thisMonthExpenses.forEach(e => {
       categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
@@ -203,7 +221,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       topCategoryName,
       topCategoryPercent
     };
-  }, [expenses]);
+  }, [expenses, yearlyBudgetItemNames]);
 
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto overscroll-none">
