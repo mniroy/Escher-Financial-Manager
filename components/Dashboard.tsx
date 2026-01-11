@@ -323,7 +323,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             >
               {yearlyItems.map(item => (
                 <option key={item.name} value={item.name}>
-                  {item.name} - {formatCurrency(item.amount)}
+                  {item.name}
                 </option>
               ))}
             </select>
@@ -332,45 +332,65 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {/* Balance Card with rotating landscape background */}
-      <div
-        className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden min-h-[160px]"
-        style={{
-          backgroundImage: `url(${getRandomBackgroundImage()})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        {/* Dark overlay for text readability */}
-        <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/60" />
+      {(() => {
+        // For yearly-only mode, show selected plan's values
+        let cardBudget = totalBudget;
+        let cardSpent = totalSpent;
+        let cardRemaining = totalRemaining;
 
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center py-2">
-          <div className="text-center mb-4">
-            <p className="text-white/70 text-[10px] uppercase tracking-wider mb-1">Total Balance</p>
-            <p className={`text-2xl font-bold ${totalRemaining < 0 ? 'text-red-300' : 'text-white'}`}>
-              {formatCurrency(totalRemaining)}
-            </p>
-          </div>
+        if (viewMode === 'yearly-only' && selectedAnnualPlan) {
+          const selectedItem = yearlyItems.find(item => item.name === selectedAnnualPlan);
+          cardBudget = selectedItem?.amount || 0;
+          cardSpent = filteredExpenses
+            .filter(e => e.budgetItemName === selectedAnnualPlan)
+            .reduce((sum, e) => sum + e.amount, 0);
+          cardRemaining = cardBudget - cardSpent;
+        }
 
-          <div className="flex justify-around pt-3 border-t border-white/20">
-            <div className="text-center flex-1">
-              <div className="flex items-center justify-center gap-1 mb-0.5">
-                <ArrowUp className="w-3 h-3 text-emerald-300" />
-                <span className="text-[10px] text-white/70 uppercase tracking-wide">Budget</span>
+        return (
+          <div
+            className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden min-h-[160px]"
+            style={{
+              backgroundImage: `url(${getRandomBackgroundImage()})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+            }}
+          >
+            {/* Dark overlay for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/60" />
+
+            {/* Content */}
+            <div className="relative z-10 flex flex-col justify-center py-2">
+              <div className="text-center mb-4">
+                <p className="text-white/70 text-[10px] uppercase tracking-wider mb-1">
+                  {viewMode === 'yearly-only' && selectedAnnualPlan ? 'Remaining' : 'Total Balance'}
+                </p>
+                <p className={`text-2xl font-bold ${cardRemaining < 0 ? 'text-red-300' : 'text-white'}`}>
+                  {formatCurrency(cardRemaining)}
+                </p>
               </div>
-              <p className="text-base font-semibold">{formatCurrency(totalBudget)}</p>
-            </div>
-            <div className="w-px bg-white/20" />
-            <div className="text-center flex-1">
-              <div className="flex items-center justify-center gap-1 mb-0.5">
-                <ArrowDown className="w-3 h-3 text-red-300" />
-                <span className="text-[10px] text-white/70 uppercase tracking-wide">Expense</span>
+
+              <div className="flex justify-around pt-3 border-t border-white/20">
+                <div className="text-center flex-1">
+                  <div className="flex items-center justify-center gap-1 mb-0.5">
+                    <ArrowUp className="w-3 h-3 text-emerald-300" />
+                    <span className="text-[10px] text-white/70 uppercase tracking-wide">Budget</span>
+                  </div>
+                  <p className="text-base font-semibold">{formatCurrency(cardBudget)}</p>
+                </div>
+                <div className="w-px bg-white/20" />
+                <div className="text-center flex-1">
+                  <div className="flex items-center justify-center gap-1 mb-0.5">
+                    <ArrowDown className="w-3 h-3 text-red-300" />
+                    <span className="text-[10px] text-white/70 uppercase tracking-wide">Expense</span>
+                  </div>
+                  <p className="text-base font-semibold">{formatCurrency(cardSpent)}</p>
+                </div>
               </div>
-              <p className="text-base font-semibold">{formatCurrency(totalSpent)}</p>
             </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Period Stats - Colorful Grid */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
