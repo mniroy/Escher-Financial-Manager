@@ -345,15 +345,16 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
   };
 
   return (
-    <div
-      className="relative flex flex-col bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200"
-      style={{ height: keyboardHeight > 0 ? `calc(100% - ${keyboardHeight}px)` : '100%' }}
-    >
+    <div className="relative flex flex-col h-full bg-gray-100 rounded-xl overflow-hidden shadow-inner border border-gray-200">
 
       {/* Messages Area - WhatsApp Style */}
       <div
-        className="flex-grow overflow-y-auto p-4 space-y-3"
-        style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}
+        className="flex-grow overflow-y-auto p-4 pb-20 space-y-3"
+        style={{
+          backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
+          paddingBottom: keyboardHeight > 0 ? `${keyboardHeight + 80}px` : '80px'
+        }}
       >
         {messages.map((msg) => (
           <div
@@ -395,8 +396,11 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area - Fixed at bottom */}
-      <div className="p-3 bg-white border-t border-gray-200 flex-shrink-0">
+      {/* Input Area - Absolute positioned, moves up with keyboard */}
+      <div
+        className="absolute left-0 right-0 p-3 bg-white border-t border-gray-200"
+        style={{ bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : 0 }}
+      >
         <div className="flex items-center gap-2 bg-gray-50 rounded-full px-2 py-2 border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
           <input
             type="text"
