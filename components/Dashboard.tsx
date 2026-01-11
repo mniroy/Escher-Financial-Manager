@@ -255,29 +255,29 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="absolute inset-0 bg-gradient-to-br from-black/50 via-black/40 to-black/60" />
 
         {/* Content */}
-        <div className="relative z-10 flex flex-col justify-center min-h-[120px]">
-          <div className="text-center mb-5">
-            <p className="text-white/70 text-xs uppercase tracking-wide mb-1">Total Balance</p>
-            <p className={`text-4xl font-bold ${totalRemaining < 0 ? 'text-red-300' : 'text-white'}`}>
+        <div className="relative z-10 flex flex-col justify-center py-2">
+          <div className="text-center mb-4">
+            <p className="text-white/70 text-[10px] uppercase tracking-wider mb-1">Total Balance</p>
+            <p className={`text-2xl font-bold ${totalRemaining < 0 ? 'text-red-300' : 'text-white'}`}>
               {formatCurrency(totalRemaining)}
             </p>
           </div>
 
-          <div className="flex justify-around pt-4 border-t border-white/20">
+          <div className="flex justify-around pt-3 border-t border-white/20">
             <div className="text-center flex-1">
-              <div className="flex items-center justify-center gap-1.5 mb-1">
-                <ArrowUp className="w-4 h-4 text-emerald-300" />
-                <span className="text-xs text-white/70 uppercase tracking-wide">Budget</span>
+              <div className="flex items-center justify-center gap-1 mb-0.5">
+                <ArrowUp className="w-3 h-3 text-emerald-300" />
+                <span className="text-[10px] text-white/70 uppercase tracking-wide">Budget</span>
               </div>
-              <p className="text-xl font-bold">{formatCurrency(totalBudget)}</p>
+              <p className="text-base font-semibold">{formatCurrency(totalBudget)}</p>
             </div>
             <div className="w-px bg-white/20" />
             <div className="text-center flex-1">
-              <div className="flex items-center justify-center gap-1.5 mb-1">
-                <ArrowDown className="w-4 h-4 text-red-300" />
-                <span className="text-xs text-white/70 uppercase tracking-wide">Expense</span>
+              <div className="flex items-center justify-center gap-1 mb-0.5">
+                <ArrowDown className="w-3 h-3 text-red-300" />
+                <span className="text-[10px] text-white/70 uppercase tracking-wide">Expense</span>
               </div>
-              <p className="text-xl font-bold">{formatCurrency(totalSpent)}</p>
+              <p className="text-base font-semibold">{formatCurrency(totalSpent)}</p>
             </div>
           </div>
         </div>
