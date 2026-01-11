@@ -169,26 +169,51 @@ const Dashboard: React.FC<DashboardProps> = ({
   const totalRemaining = totalBudget - totalSpent;
 
   // Calculate This Month's Stats from actual spending (excluding yearly expenses)
-  const monthlyStats = useMemo(() => {
+  // Calculate Period Stats based on selected period (not just current month)
+  const periodStats = useMemo(() => {
+    // Use selected period for filtering
+    const periodExpenses = viewMode === 'monthly'
+      ? expenses.filter(e => {
+        const d = new Date(e.date);
+        const isYearlyExpense = e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
+        return d.getMonth() === displayedMonth && d.getFullYear() === displayedYear && !isYearlyExpense;
+      })
+      : viewMode === 'yearly-only'
+        ? expenses.filter(e => {
+          const d = new Date(e.date);
+          return d.getFullYear() === displayedYear && e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
+        })
+        : expenses.filter(e => {
+          const d = new Date(e.date);
+          return d.getFullYear() === displayedYear;
+        });
+
+    const totalReceipts = periodExpenses.length;
+
+    // Days in period for daily average
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    let daysInPeriod = 1;
+    if (viewMode === 'monthly') {
+      // If viewing current month, use days passed; otherwise use full month
+      if (displayedMonth === now.getMonth() && displayedYear === now.getFullYear()) {
+        daysInPeriod = now.getDate();
+      } else {
+        daysInPeriod = new Date(displayedYear, displayedMonth + 1, 0).getDate();
+      }
+    } else {
+      // For yearly views, use days passed in year or full year
+      if (displayedYear === now.getFullYear()) {
+        const startOfYear = new Date(displayedYear, 0, 1);
+        daysInPeriod = Math.ceil((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+      } else {
+        daysInPeriod = 365;
+      }
+    }
 
-    // Filter expenses for current month, excluding yearly budget items
-    const thisMonthExpenses = expenses.filter(e => {
-      const d = new Date(e.date);
-      const isYearlyExpense = e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
-      return d.getMonth() === currentMonth && d.getFullYear() === currentYear && !isYearlyExpense;
-    });
+    const totalSpent = periodExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const avgDailySpend = daysInPeriod > 0 ? totalSpent / daysInPeriod : 0;
 
-    const totalReceipts = thisMonthExpenses.length;
-    const totalSpentThisMonth = thisMonthExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-    // Days passed in current month
-    const dayOfMonth = now.getDate();
-    const avgDailySpend = dayOfMonth > 0 ? totalSpentThisMonth / dayOfMonth : 0;
-
-    // Average monthly spend (based on non-yearly expenses only)
+    // Average monthly spend (based on all non-yearly expenses)
     const nonYearlyExpenses = expenses.filter(e => {
       const isYearlyExpense = e.budgetItemName && yearlyBudgetItemNames.has(e.budgetItemName);
       return !isYearlyExpense;
@@ -200,27 +225,22 @@ const Dashboard: React.FC<DashboardProps> = ({
     const monthCount = Math.max(allMonths.size, 1);
     const avgMonthlySpend = nonYearlyExpenses.reduce((sum, e) => sum + e.amount, 0) / monthCount;
 
-    // Top category for this month (based on actual spending, excluding yearly)
+    // Top category for this period
     const categoryTotals: Record<string, number> = {};
-    thisMonthExpenses.forEach(e => {
+    periodExpenses.forEach(e => {
       categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount;
     });
 
     const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
     const topCategoryName = topCategory ? topCategory[0] : '-';
-    const topCategoryPercent = topCategory && totalSpentThisMonth > 0
-      ? (topCategory[1] / totalSpentThisMonth) * 100
-      : 0;
 
     return {
       totalReceipts,
-      totalSpentThisMonth,
       avgDailySpend,
       avgMonthlySpend,
       topCategoryName,
-      topCategoryPercent
     };
-  }, [expenses, yearlyBudgetItemNames]);
+  }, [expenses, yearlyBudgetItemNames, viewMode, displayedMonth, displayedYear]);
 
   return (
     <div className="flex flex-col gap-3 p-3 h-full overflow-y-auto overscroll-none">
@@ -319,11 +339,11 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* This Month's Stats - Colorful Grid */}
+      {/* Period Stats - Colorful Grid */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
         <div className="flex items-center gap-2 mb-2">
           <TrendingUp className="w-4 h-4 text-emerald-500" />
-          <h3 className="text-sm font-bold text-gray-800">This Month's Stats</h3>
+          <h3 className="text-sm font-bold text-gray-800">{dateLabel} Stats</h3>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -333,34 +353,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <Receipt className="w-3.5 h-3.5 text-emerald-600" />
               <span className="text-[10px] font-medium text-emerald-700">Total Receipts</span>
             </div>
-            <p className="text-lg font-bold text-emerald-600">{monthlyStats.totalReceipts}</p>
-          </div>
-
-          {/* Total Spent */}
-          <div className="bg-cyan-50 rounded-lg p-2.5 border border-cyan-100">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <Wallet className="w-3.5 h-3.5 text-cyan-600" />
-              <span className="text-[10px] font-medium text-cyan-700">Total Spent</span>
-            </div>
-            <p className="text-base font-bold text-cyan-600">{formatCurrency(monthlyStats.totalSpentThisMonth)}</p>
-          </div>
-
-          {/* Avg Daily Spend */}
-          <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-100">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <CalendarDays className="w-3.5 h-3.5 text-amber-600" />
-              <span className="text-[10px] font-medium text-amber-700">Avg. Daily Spend</span>
-            </div>
-            <p className="text-base font-bold text-amber-600">{formatCurrency(monthlyStats.avgDailySpend)}</p>
-          </div>
-
-          {/* Avg Monthly Spend */}
-          <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-100">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <BarChart3 className="w-3.5 h-3.5 text-purple-600" />
-              <span className="text-[10px] font-medium text-purple-700">Avg. Monthly Spend</span>
-            </div>
-            <p className="text-base font-bold text-purple-600">{formatCurrency(monthlyStats.avgMonthlySpend)}</p>
+            <p className="text-lg font-bold text-emerald-600">{periodStats.totalReceipts}</p>
           </div>
 
           {/* Top Category */}
@@ -369,16 +362,25 @@ const Dashboard: React.FC<DashboardProps> = ({
               <Tag className="w-3.5 h-3.5 text-violet-600" />
               <span className="text-[10px] font-medium text-violet-700">Top Category</span>
             </div>
-            <p className="text-sm font-bold text-violet-600 truncate capitalize">{monthlyStats.topCategoryName}</p>
+            <p className="text-sm font-bold text-violet-600 truncate capitalize">{periodStats.topCategoryName}</p>
           </div>
 
-          {/* Top Category % */}
-          <div className="bg-rose-50 rounded-lg p-2.5 border border-rose-100">
+          {/* Avg Daily Spend */}
+          <div className="bg-amber-50 rounded-lg p-2.5 border border-amber-100">
             <div className="flex items-center gap-1.5 mb-0.5">
-              <PieChart className="w-3.5 h-3.5 text-rose-500" />
-              <span className="text-[10px] font-medium text-rose-600">Top Cat. %</span>
+              <CalendarDays className="w-3.5 h-3.5 text-amber-600" />
+              <span className="text-[10px] font-medium text-amber-700">Avg. Daily Spend</span>
             </div>
-            <p className="text-lg font-bold text-rose-500">{monthlyStats.topCategoryPercent.toFixed(1)}%</p>
+            <p className="text-base font-bold text-amber-600">{formatCurrency(periodStats.avgDailySpend)}</p>
+          </div>
+
+          {/* Avg Monthly Spend */}
+          <div className="bg-purple-50 rounded-lg p-2.5 border border-purple-100">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <BarChart3 className="w-3.5 h-3.5 text-purple-600" />
+              <span className="text-[10px] font-medium text-purple-700">Avg. Monthly Spend</span>
+            </div>
+            <p className="text-base font-bold text-purple-600">{formatCurrency(periodStats.avgMonthlySpend)}</p>
           </div>
         </div>
       </div>
@@ -460,8 +462,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
