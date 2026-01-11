@@ -24,17 +24,9 @@ const LANDSCAPE_BACKGROUNDS = [
   'https://images.unsplash.com/photo-1565967511849-76a60a516170?w=800&h=600&fit=crop&q=80',
 ];
 
-// Get the background image that rotates once per day
-const getDailyBackgroundImage = (): string => {
-  const now = new Date();
-  // Use day of year to determine which image to show
-  const startOfYear = new Date(now.getFullYear(), 0, 0);
-  const diff = now.getTime() - startOfYear.getTime();
-  const oneDay = 1000 * 60 * 60 * 24;
-  const dayOfYear = Math.floor(diff / oneDay);
-
-  // Cycle through 12 images - each image shows for one day
-  const imageIndex = dayOfYear % LANDSCAPE_BACKGROUNDS.length;
+// Get a random background image on every refresh
+const getRandomBackgroundImage = (): string => {
+  const imageIndex = Math.floor(Math.random() * LANDSCAPE_BACKGROUNDS.length);
   return LANDSCAPE_BACKGROUNDS[imageIndex];
 };
 
@@ -237,7 +229,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       <div
         className="rounded-2xl p-5 text-white shadow-lg relative overflow-hidden"
         style={{
-          backgroundImage: `url(${getDailyBackgroundImage()})`,
+          backgroundImage: `url(${getRandomBackgroundImage()})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
         }}
