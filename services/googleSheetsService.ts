@@ -6,6 +6,8 @@ export const fetchSheetValues = async (user: User, range: string) => {
   if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
 
   const response = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/${range}`, {
+    method: 'GET',
+    cache: 'no-store',
     headers: {
       Authorization: `Bearer ${user.accessToken}`,
     },

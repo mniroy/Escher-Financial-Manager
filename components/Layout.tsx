@@ -49,6 +49,28 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     }
   };
 
+  // Helper to check if the touch target is inside a container that is scrolled
+  const isScrolledToTop = (target: EventTarget | null) => {
+    let el = target as HTMLElement;
+    
+    // Traverse up to find scrollable containers
+    while (el && el !== document.body) {
+      // Check if this element is scrollable
+      const style = window.getComputedStyle(el);
+      const overflowY = style.overflowY;
+      const isScrollable = (overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
+      
+      if (isScrollable) {
+        if (el.scrollTop > 0) {
+          return false; // Found a container that is scrolled down
+        }
+      }
+      
+      el = el.parentElement as HTMLElement;
+    }
+    return true; // All scrollable containers are at the top
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     // Store start position for swipe detection
     setSwipeStartX(e.touches[0].clientX);
@@ -56,8 +78,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     setIsSwiping(false);
 
     // Pull to refresh logic
-    if (window.scrollY === 0 && !isRefreshing && onRefresh) {
+    // We only enable pull-to-refresh if we are at the top of the scroll container
+    if (onRefresh && !isRefreshing && isScrolledToTop(e.target)) {
       setStartY(e.touches[0].clientY);
+    } else {
+      setStartY(0); // Reset if not applicable
     }
   };
 
@@ -73,12 +98,18 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     }
 
     // Pull to refresh logic (only if not horizontal swiping)
-    if (!isSwiping && startY > 0 && !isRefreshing && window.scrollY === 0 && onRefresh) {
+    if (!isSwiping && startY > 0 && !isRefreshing && onRefresh) {
       const diff = currentY - startY;
 
       if (diff > 0) {
+        // Prevent default scrolling when pulling down at the top
+        // e.preventDefault(); // Note: This might block scrolling if not careful, usually better to rely on CSS overscroll-behavior
+        
         const newDistance = Math.min(diff * 0.4, 120);
         setPullDistance(newDistance);
+      } else {
+        // If we scroll up (pushing content down), reset
+        setPullDistance(0);
       }
     }
   };
@@ -112,9 +143,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       setStartY(0);
       return;
     }
-    if (pullDistance > 60) {
+    
+    // Trigger refresh if pulled far enough
+    if (pullDistance > 60 && startY > 0) {
       setIsRefreshing(true);
-      setPullDistance(60);
+      setPullDistance(60); // Snap to loading position
       try {
         await onRefresh();
       } finally {
