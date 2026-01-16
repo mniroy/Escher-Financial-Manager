@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, CreditCard, Plane } from 'lucide-react';
 import { fileToGenerativePart, analyzeReceipt } from '../services/geminiService';
 import { BudgetCategory, Expense, BudgetLineItem } from '../types';
@@ -11,6 +11,7 @@ interface ExpenseLoggerProps {
     appMode: 'standard' | 'yearly';
     activePlan: string;
     onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;
+    initialData?: any;
 }
 
 interface LogTask {
@@ -26,11 +27,76 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
     budgetItems = [],
     appMode,
     activePlan,
-    onModeChange
+    onModeChange,
+    initialData
 }) => {
     const [tasks, setTasks] = useState<LogTask[]>([]);
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
+
+    // Effect to handle initialData (from WhatsApp bridge)
+    useEffect(() => {
+        if (initialData) {
+            processInitialData(initialData);
+        }
+    }, [initialData]);
+
+    const processInitialData = async (data: any) => {
+        const taskId = crypto.randomUUID();
+        setTasks(prev => [{
+            id: taskId,
+            status: 'processing',
+            message: 'Processing WhatsApp receipt...'
+        }, ...prev]);
+
+        try {
+            const { amount, merchant, date, category, base64Image, mimeType } = data;
+
+            const finalCategory = activeYearlyPlan ? activeYearlyPlan.category : (category as BudgetCategory);
+            const finalPlanName = activeYearlyPlan ? activeYearlyPlan.name : undefined;
+            const expenseDate = date || new Date().toISOString().split('T')[0];
+            const description = merchant || 'WhatsApp Receipt';
+
+            const dateSlug = expenseDate.replace(/-/g, '');
+            const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
+            const expenseId = `${dateSlug}-${finalCategory.replace(/\s+/g, '')}-${descSlug}`;
+
+            const receiptFileName = `receipt-${expenseId}.${mimeType?.split('/')[1] || 'jpg'}`;
+            let receiptUrl = '';
+
+            if (base64Image) {
+                try {
+                    receiptUrl = await onUploadReceipt(base64Image, mimeType, receiptFileName, expenseDate);
+                } catch (e) {
+                    console.warn('Failed upload', e);
+                    receiptUrl = 'upload-failed';
+                }
+            }
+
+            const newExpense: Expense = {
+                id: expenseId,
+                amount,
+                category: finalCategory,
+                date: expenseDate,
+                description,
+                receiptUrl,
+                budgetItemName: finalPlanName
+            };
+
+            await onSave(newExpense);
+
+            setTasks(prev => prev.map(t => t.id === taskId ? {
+                ...t,
+                status: 'success',
+                message: 'Saved from WhatsApp!',
+                detail: `${description} - ${formatCurrency(amount)}`
+            } : t));
+        } catch (error: any) {
+            setTasks(prev => prev.map(t => t.id === taskId ? {
+                ...t, status: 'error', message: 'Bridge failed', detail: error.message
+            } : t));
+        }
+    };
 
     // Filter only Yearly items for the dropdown
     const yearlyBudgetItems = useMemo(() => {

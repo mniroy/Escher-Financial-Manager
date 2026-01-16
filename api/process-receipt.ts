@@ -1,64 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { analyzeReceipt } from './_lib/analysis';
 
-// Gemini API URL
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
-
-// Budget categories for classification
-const BUDGET_CATEGORIES = [
-    'Asset Aquire', 'Bill', 'Debt Payment', 'Education', 'Food', 'Grocery',
-    'Home Maintenance', 'Mortgage', 'Shopping', 'Tax', 'Transportation', 'Vacation', 'Other'
-];
-
+// Constants for normalization
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'];
-
-interface AnalysisResult {
-    amount: number;
-    merchant: string;
-    date: string;
-    category: string;
-}
-
-// Helper to clean base64 data
-function cleanBase64(base64: string): string {
-    return base64
-        .replace(/^data:image\/[a-z]+;base64,/, '')
-        .replace(/^=/, '')
-        .trim();
-}
-
-// Gemini AI Analysis
-async function analyzeReceipt(base64Image: string, mimeType: string, apiKey: string): Promise<AnalysisResult> {
-    const cleanData = cleanBase64(base64Image);
-    const currentDate = new Date().toISOString().split('T')[0];
-
-    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{
-                parts: [
-                    { inlineData: { mimeType, data: cleanData } },
-                    {
-                        text: `Analyze this receipt. Extract total amount, merchant, date, and category.
-                        
-CONTEXT:
-- Today's date is ${currentDate}.
-- Use this as reference when parsing the year (e.g., if you see "26", it's likely 2026).
-- CRITICAL: Indonesian Rupiah - dots are THOUSAND separators (Rp134.100 = 134100).
-- Categories: ${BUDGET_CATEGORIES.join(', ')}.
-
-Return JSON: {"amount": number, "merchant": string, "date": "YYYY-MM-DD", "category": string}`
-                    }
-                ]
-            }],
-            generationConfig: { responseMimeType: "application/json" }
-        })
-    });
-    if (!response.ok) throw new Error(`Gemini error: ${await response.text()}`);
-    const data = await response.json();
-    return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
-}
 
 // Read raw body helper
 async function getRawBody(req: VercelRequest): Promise<string> {
@@ -71,12 +16,7 @@ async function getRawBody(req: VercelRequest): Promise<string> {
     });
 }
 
-// Main Handler - Only does Gemini analysis
-// Google Drive and Sheets operations are handled by n8n
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    console.log('--- Request Debug ---');
-    console.log('Method:', req.method);
-
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-API-KEY');
@@ -95,23 +35,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const rawBody = await getRawBody(req);
-        if (!rawBody || rawBody === '{}' || rawBody === '') {
-            return res.status(400).json({ success: false, error: 'Request body is empty' });
-        }
+        if (!rawBody) return res.status(400).json({ success: false, error: 'Request body is empty' });
 
-        let body;
-        try {
-            body = JSON.parse(rawBody);
-        } catch (e) {
-            return res.status(400).json({ success: false, error: 'Request body is not valid JSON' });
-        }
-
+        const body = JSON.parse(rawBody);
         const { base64Image, mimeType } = body;
+
         if (!base64Image || !mimeType) {
-            const missing = [];
-            if (!base64Image) missing.push('base64Image');
-            if (!mimeType) missing.push('mimeType');
-            return res.status(400).json({ success: false, error: `Missing fields: ${missing.join(', ')}` });
+            return res.status(400).json({ success: false, error: 'Missing base64Image or mimeType' });
         }
 
         // Analyze receipt with Gemini
@@ -120,22 +50,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Normalize response
         const expenseDate = analysis.date || new Date().toISOString().split('T')[0];
         const merchant = analysis.merchant || 'Unknown';
-        const category = BUDGET_CATEGORIES.includes(analysis.category) ? analysis.category : 'Other';
-        const amount = typeof analysis.amount === 'number' ? analysis.amount : 0;
-
-        // Parse date for folder info
-        const dateParts = expenseDate.split('-');
-        const year = dateParts[0];
-        const monthIndex = parseInt(dateParts[1], 10) - 1;
-        const month = MONTH_NAMES[monthIndex] || 'January';
+        const amount = analysis.amount || 0;
+        const category = analysis.category;
 
         // Generate expense ID
         const dateSlug = expenseDate.replace(/-/g, '');
         const descSlug = merchant.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
         const expenseId = `${dateSlug}-${category.replace(/\s+/g, '')}-${descSlug}`;
-        const fileName = `receipt-${expenseId}.jpg`;
 
-        // Return analysis + metadata for n8n to use
         return res.status(200).json({
             success: true,
             data: {
@@ -149,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
     } catch (error: any) {
-        console.error('Full Error:', error);
+        console.error('API Error:', error);
         return res.status(500).json({ success: false, error: error.message || 'Internal error' });
     }
 }

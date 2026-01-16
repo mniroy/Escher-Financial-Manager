@@ -5,21 +5,44 @@ const SCOPES = 'https://www.googleapis.com/auth/spreadsheets https://www.googlea
 // Hardcoded Client ID - shared across components
 export const GOOGLE_CLIENT_ID = '691804601172-eg2ajh42fmeep7a67g48rf7ospnun11g.apps.googleusercontent.com';
 
-export const initTokenClient = (clientId: string, callback: (response: any) => void) => {
+/**
+ * Initializes the Code Client (Authorization Code Flow)
+ * This allows us to get a Refresh Token for permanent login.
+ */
+export const initCodeClient = (callback: (response: any) => void) => {
   // @ts-ignore
   if (typeof google === 'undefined') return null;
 
   try {
     // @ts-ignore
-    return google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
+    return google.accounts.oauth2.initCodeClient({
+      client_id: GOOGLE_CLIENT_ID,
       scope: SCOPES,
+      ux_mode: 'popup',
+      access_type: 'offline', // Critical for refresh token
+      prompt: 'consent select_account', // Ensures refresh token is returned and account can be switched
       callback: callback,
     });
   } catch (e) {
-    console.error("Error initializing token client", e);
+    console.error("Error initializing code client", e);
     return null;
   }
+};
+
+/**
+ * Exchanges an Authorization Code for Access & Refresh tokens
+ */
+export const exchangeCodeForTokens = async (code: string) => {
+  const response = await fetch('/api/auth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code })
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.error || 'Failed to exchange code');
+  }
+  return await response.json();
 };
 
 // Check if the token is expired (with 5 minute buffer)
@@ -29,51 +52,37 @@ export const isTokenExpired = (user: User): boolean => {
   return Date.now() >= (user.tokenExpiry - bufferMs);
 };
 
-// Silently refresh the token using Google Identity Services
-// Returns a new User object with updated token, or null if refresh fails
-export const silentRefreshToken = (user: User): Promise<User | null> => {
-  return new Promise((resolve) => {
-    // @ts-ignore
-    if (typeof google === 'undefined') {
-      console.error('Google Identity Services not loaded');
-      resolve(null);
-      return;
-    }
+/**
+ * Refreshes the access token using the Refresh Token
+ */
+export const silentRefreshToken = async (user: User): Promise<User | null> => {
+  if (!user.refreshToken) {
+    console.warn("No refresh token available for permanent login");
+    return null;
+  }
 
-    try {
-      // @ts-ignore
-      const client = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-        scope: SCOPES,
-        hint: user.email, // Pre-fill with user's email for seamless refresh
-        prompt: '', // Empty prompt for silent refresh (no popup)
-        callback: (tokenResponse: any) => {
-          if (tokenResponse && tokenResponse.access_token) {
-            const expiresIn = tokenResponse.expires_in || 3600;
-            const tokenExpiry = Date.now() + (expiresIn * 1000);
+  try {
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: user.refreshToken })
+    });
 
-            resolve({
-              ...user,
-              accessToken: tokenResponse.access_token,
-              tokenExpiry: tokenExpiry
-            });
-          } else {
-            console.log('Silent refresh failed, user needs to re-login');
-            resolve(null);
-          }
-        },
-        error_callback: (error: any) => {
-          console.log('Token refresh error:', error);
-          resolve(null);
-        }
-      });
+    if (!response.ok) return null;
 
-      client.requestAccessToken();
-    } catch (e) {
-      console.error('Error during silent refresh:', e);
-      resolve(null);
-    }
-  });
+    const data = await response.json();
+    const expiresIn = data.expires_in || 3600;
+    const tokenExpiry = Date.now() + (expiresIn * 1000);
+
+    return {
+      ...user,
+      accessToken: data.access_token,
+      tokenExpiry: tokenExpiry
+    };
+  } catch (e) {
+    console.error('Error during silent refresh:', e);
+    return null;
+  }
 };
 
 export const getUserInfo = async (accessToken: string): Promise<Partial<User>> => {
@@ -137,8 +146,8 @@ export const createEscherSpreadsheet = async (accessToken: string): Promise<stri
           values: [['Category', 'Item Name', 'Amount', 'Frequency']]
         },
         {
-          range: 'Expenses!A1:F1',
-          values: [['ID', 'Date', 'Category', 'Description', 'Amount', 'ReceiptUrl']]
+          range: 'Expenses!A1:G1',
+          values: [['ID', 'Date', 'Category', 'Description', 'Amount', 'ReceiptUrl', 'BudgetItemName']]
         }
       ]
     })

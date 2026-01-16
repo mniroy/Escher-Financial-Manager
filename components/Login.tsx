@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { initTokenClient, getUserInfo, findEscherSpreadsheet, createEscherSpreadsheet, GOOGLE_CLIENT_ID } from '../services/authService';
+import { initCodeClient, exchangeCodeForTokens, getUserInfo, findEscherSpreadsheet, createEscherSpreadsheet, GOOGLE_CLIENT_ID } from '../services/authService';
 import { Loader2, ShieldCheck, AlertCircle } from 'lucide-react';
 
 interface LoginProps {
@@ -19,34 +19,40 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     }
 
     setIsLoading(true);
-    setStatus('Waiting for Google Sign In...');
+    setStatus('Requesting Offline Access...');
     setError(null);
 
-    const client = initTokenClient(GOOGLE_CLIENT_ID, async (tokenResponse: any) => {
-      if (tokenResponse && tokenResponse.access_token) {
+    const client = initCodeClient(async (codeResponse: any) => {
+      if (codeResponse && codeResponse.code) {
         try {
+          setStatus('Exchanging tokens for permanent login...');
+          const tokens = await exchangeCodeForTokens(codeResponse.code);
+
+          const accessToken = tokens.access_token;
+          const refreshToken = tokens.refresh_token; // Received only on first-time consent or if force prompt
+
           setStatus('Verifying Identity...');
-          const userInfo = await getUserInfo(tokenResponse.access_token);
+          const userInfo = await getUserInfo(accessToken);
 
           setStatus('Syncing with Google Drive...');
-          let sheetId = await findEscherSpreadsheet(tokenResponse.access_token);
+          let sheetId = await findEscherSpreadsheet(accessToken);
 
           if (!sheetId) {
             setStatus('Creating new Financial Database...');
-            sheetId = await createEscherSpreadsheet(tokenResponse.access_token);
+            sheetId = await createEscherSpreadsheet(accessToken);
           } else {
             setStatus('Found existing database...');
           }
 
-          // Calculate token expiry (expires_in is in seconds, default to 1 hour if not provided)
-          const expiresIn = tokenResponse.expires_in || 3600;
+          const expiresIn = tokens.expires_in || 3600;
           const tokenExpiry = Date.now() + (expiresIn * 1000);
 
           const fullUser: User = {
             name: userInfo.name || 'User',
             email: userInfo.email || '',
             picture: userInfo.picture || '',
-            accessToken: tokenResponse.access_token,
+            accessToken: accessToken,
+            refreshToken: refreshToken, // Saved for future sessions
             spreadsheetId: sheetId,
             tokenExpiry: tokenExpiry
           };
@@ -59,16 +65,16 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         }
       } else {
         setIsLoading(false);
-        if (tokenResponse?.error) {
-          setError(`Auth Error: ${tokenResponse.error}`);
+        if (codeResponse?.error) {
+          setError(`Auth Error: ${codeResponse.error}`);
         }
       }
     });
 
     if (client) {
-      client.requestAccessToken();
+      client.requestCode();
     } else {
-      setError("Google Identity Services failed to load. Please refresh the page.");
+      setError("Google Identity Services failed to load. Please refresh.");
       setIsLoading(false);
     }
   };
@@ -112,12 +118,12 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
               className="group w-full flex items-center justify-center gap-3 bg-white border border-gray-200 hover:border-indigo-300 text-gray-700 font-medium py-3.5 px-4 rounded-xl hover:bg-indigo-50/30 transition-all shadow-sm hover:shadow-md"
             >
               <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5 group-hover:scale-110 transition-transform" alt="Google" />
-              <span>Continue with Google</span>
+              <span>Login to Permanent Dashboard</span>
             </button>
 
             <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
-              <span>Private & Secure • Synced to your Drive</span>
+              <span>Permanent Access • Securely Synced</span>
             </div>
           </div>
         )}

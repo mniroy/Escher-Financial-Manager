@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Download, RefreshCw, LogOut, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Bell } from 'lucide-react';
+import { Download, RefreshCw, LogOut, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Bell, Settings as SettingsIcon } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications' | 'settings') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
@@ -52,20 +52,20 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
   // Helper to check if the touch target is inside a container that is scrolled
   const isScrolledToTop = (target: EventTarget | null) => {
     let el = target as HTMLElement;
-    
+
     // Traverse up to find scrollable containers
     while (el && el !== document.body) {
       // Check if this element is scrollable
       const style = window.getComputedStyle(el);
       const overflowY = style.overflowY;
       const isScrollable = (overflowY === 'auto' || overflowY === 'scroll') && el.scrollHeight > el.clientHeight;
-      
+
       if (isScrollable) {
         if (el.scrollTop > 0) {
           return false; // Found a container that is scrolled down
         }
       }
-      
+
       el = el.parentElement as HTMLElement;
     }
     return true; // All scrollable containers are at the top
@@ -104,7 +104,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       if (diff > 0) {
         // Prevent default scrolling when pulling down at the top
         // e.preventDefault(); // Note: This might block scrolling if not careful, usually better to rely on CSS overscroll-behavior
-        
+
         const newDistance = Math.min(diff * 0.4, 120);
         setPullDistance(newDistance);
       } else {
@@ -143,7 +143,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       setStartY(0);
       return;
     }
-    
+
     // Trigger refresh if pulled far enough
     if (pullDistance > 60 && startY > 0) {
       setIsRefreshing(true);
@@ -175,9 +175,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
           {/* Home Icon */}
           <button
             onClick={() => setActiveTab('dashboard')}
-            className="p-2 -ml-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+            className={`p-2 -ml-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
           >
             <LayoutGrid className="w-5 h-5" />
+          </button>
+
+          <button
+            onClick={() => setActiveTab('settings')}
+            className={`p-2 -ml-2 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
+          >
+            <SettingsIcon className="w-5 h-5" />
           </button>
 
           {/* Page Title */}
@@ -188,6 +195,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             {activeTab === 'budget' && 'Budget'}
             {activeTab === 'chat' && 'Assistant'}
             {activeTab === 'notifications' && 'Notifications'}
+            {activeTab === 'settings' && 'Settings'}
           </h1>
 
           {/* Notification Icon */}
@@ -203,7 +211,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             )}
           </button>
         </div>
-      </header>
+      </header >
 
       <div
         className="fixed top-16 left-0 w-full flex justify-center pointer-events-none z-40 transition-transform duration-200 ease-out"
@@ -271,7 +279,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
           </button>
         </div>
       </nav>
-    </div>
+    </div >
   );
 };
 

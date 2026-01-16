@@ -59,6 +59,7 @@ export interface User {
   email: string;
   picture: string;
   accessToken: string; // OAuth access token
+  refreshToken?: string; // Long-lived refresh token
   spreadsheetId?: string;
   tokenExpiry?: number; // Timestamp when the access token expires
 }
@@ -73,4 +74,12 @@ export interface Notification {
   read: boolean;
   expenseId?: string; // link to related expense
   category?: string; // for budget alerts
+}
+
+export interface WahaConfig {
+  apiUrl: string;
+  apiKey: string;
+  session: string;
+  allowedIds: string; // Comma separated IDs
+  pushSubscription?: any; // To allow the backend to send push notifications
 }

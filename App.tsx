@@ -7,6 +7,7 @@ import ChatAssistant from './components/ChatAssistant';
 import TransactionList from './components/TransactionList';
 import NotificationPage from './components/NotificationPage';
 import Login from './components/Login';
+import Settings from './components/Settings';
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
@@ -19,7 +20,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications' | 'settings'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
@@ -30,6 +31,7 @@ export default function App() {
   // Global App Mode State (Persistent)
   const [appMode, setAppMode] = useState<'standard' | 'yearly'>('standard');
   const [activePlan, setActivePlan] = useState<string>('');
+  const [waExpense, setWaExpense] = useState<any>(null);
 
   // Helper to refresh notifications from storage
   const refreshNotifications = () => {
@@ -70,7 +72,28 @@ export default function App() {
       // Load notifications
       refreshNotifications();
 
+      // Check for WhatsApp bridged expense in URL
+      const checkWaExpense = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const waExpenseRaw = urlParams.get('wa_expense');
+        if (waExpenseRaw) {
+          try {
+            const data = JSON.parse(atob(waExpenseRaw));
+            setWaExpense(data);
+            setActiveTab('input');
+            // Clean URL without reloading
+            window.history.replaceState({}, document.title, window.location.pathname);
+          } catch (e) {
+            console.error("Failed to parse WhatsApp expense", e);
+          }
+        }
+      };
+
+      checkWaExpense();
+      window.addEventListener('popstate', checkWaExpense);
+
       setIsInitializing(false);
+      return () => window.removeEventListener('popstate', checkWaExpense);
     };
 
     initApp();
@@ -345,6 +368,7 @@ export default function App() {
             appMode={appMode}
             activePlan={activePlan}
             onModeChange={handleModeChange}
+            initialData={waExpense}
           />
         </div>
       )}
@@ -371,6 +395,7 @@ export default function App() {
           onNotificationsChange={refreshNotifications}
         />
       )}
+      {activeTab === 'settings' && <Settings />}
     </Layout>
   );
 }
