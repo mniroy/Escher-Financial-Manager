@@ -4,7 +4,6 @@ const WAHA_CONFIG_KEY = 'escher_waha_config';
 
 const DEFAULT_CONFIG: WahaConfig = {
     apiUrl: 'https://waha.royyaninezfamily.my.id',
-    apiKey: '',
     session: 'default',
     allowedIds: ''
 };
@@ -32,8 +31,8 @@ export const sendWahaMessage = async (config: WahaConfig, to: string, text: stri
         const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'X-Api-Key': config.apiKey
+                'Content-Type': 'application/json'
+                // apiKey is now handled securely on the backend via environment variables
             },
             body: JSON.stringify({
                 chatId: to,

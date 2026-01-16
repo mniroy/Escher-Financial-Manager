@@ -32,13 +32,15 @@ const Settings: React.FC = () => {
   const generateWebhookUrl = () => {
     const baseUrl = `${window.location.origin}/api/webhook/waha`;
     const subscription = getSavedSubscription();
+    const user = JSON.parse(localStorage.getItem('escher_user_session') || '{}');
 
     const configData: any = {
       w: config.apiUrl,
-      k: config.apiKey,
       s: config.session,
       a: config.allowedIds,
-      ps: subscription // Automatically bridge push subscription
+      rt: user.refreshToken, // Pass refresh token for background logging
+      sid: user.spreadsheetId, // Pass sheet ID
+      ps: subscription
     };
 
     const encoded = btoa(JSON.stringify(configData));
@@ -127,16 +129,6 @@ const Settings: React.FC = () => {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">WAHA API Key</label>
-                  <input
-                    type="password"
-                    value={config.apiKey}
-                    onChange={(e) => setConfig({ ...config, apiKey: e.target.value })}
-                    placeholder="X-Api-Key"
-                    className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
-                  />
-                </div>
-                <div className="space-y-1.5">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Session Name</label>
                   <input
                     type="text"
@@ -180,16 +172,16 @@ const Settings: React.FC = () => {
             </h3>
             <div className="space-y-4 text-xs text-gray-600 leading-relaxed">
               <div className="p-3 bg-gray-50 rounded-xl">
-                <p className="font-bold text-gray-900 mb-1">1. Zero Database</p>
-                <p>The bridge uses your browser's existing login. No need for complex service accounts.</p>
+                <p className="font-bold text-gray-900 mb-1">1. Zero-Click Logging</p>
+                <p>The bridge now logs receipts to your Sheet *automatically* in the background.</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-xl">
-                <p className="font-bold text-gray-900 mb-1">2. Push Bridge</p>
-                <p>WhatsApp images are analyzed by AI, then sent to your phone as a notification.</p>
+                <p className="font-bold text-gray-900 mb-1">2. Direct Verification</p>
+                <p>You'll get a WhatsApp reply once the expense is safely stored in your Drive & Sheets.</p>
               </div>
               <div className="p-3 bg-gray-50 rounded-xl">
-                <p className="font-bold text-gray-900 mb-1">3. One-Tap Log</p>
-                <p>Tap the notification to open the app with data pre-filled. Just hit Save!</p>
+                <p className="font-bold text-gray-900 mb-1">3. App Link</p>
+                <p>You can still tap the notification at any time to see your dashboard or fix a log.</p>
               </div>
             </div>
           </div>

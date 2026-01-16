@@ -395,7 +395,11 @@ export default function App() {
           onNotificationsChange={refreshNotifications}
         />
       )}
-      {activeTab === 'settings' && <Settings />}
+      {activeTab === 'settings' && (
+        <div className="flex-1 overflow-y-auto w-full">
+          <Settings />
+        </div>
+      )}
     </Layout>
   );
 }

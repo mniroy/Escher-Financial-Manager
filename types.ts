@@ -78,7 +78,6 @@ export interface Notification {
 
 export interface WahaConfig {
   apiUrl: string;
-  apiKey: string;
   session: string;
   allowedIds: string; // Comma separated IDs
   pushSubscription?: any; // To allow the backend to send push notifications

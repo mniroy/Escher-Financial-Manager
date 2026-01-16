@@ -1,4 +1,28 @@
 import crypto from 'crypto';
+const CLIENT_ID = '691804601172-eg2ajh42fmeep7a67g48rf7ospnun11g.apps.googleusercontent.com';
+
+export async function refreshGoogleToken(refreshToken: string): Promise<string> {
+    const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+    if (!CLIENT_SECRET) throw new Error("GOOGLE_CLIENT_SECRET missing on server");
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            refresh_token: refreshToken,
+            client_id: CLIENT_ID,
+            client_secret: CLIENT_SECRET,
+            grant_type: 'refresh_token',
+        }).toString(),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Token Refresh Failed: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+}
 
 export async function getGoogleAccessToken(clientEmail: string, privateKey: string): Promise<string> {
     const header = {
