@@ -213,7 +213,12 @@ ${logStatus}`;
         const replyRes = await fetch(`${wahaUrl.replace(/\/$/, '')}/api/sendText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
-            body: JSON.stringify({ chatId, text: report, session })
+            body: JSON.stringify({
+                chatId,
+                text: report,
+                session,
+                linkPreview: false // Disable to prevent engine crash on Drive links
+            })
         });
 
         if (!replyRes.ok) {
