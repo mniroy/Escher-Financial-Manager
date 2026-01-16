@@ -44,19 +44,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ status: 'ignored' });
     }
 
-    // WAHA structures vary by engine/version. We try to find the normalized data first.
-    // Based on docs: body.payload is the standard for 'message' events.
+    // WAHA structures vary by engine/version.
     const payload = body.payload || body.data || body;
 
-    const chatId = payload.from || payload.key?.remoteJid;
-    const fromMe = payload.fromMe || payload.key?.fromMe;
+    // Extract core identifiers
     const messageId = payload.id || payload.key?.id;
+    const fromMe = payload.fromMe || payload.key?.fromMe;
+    const chatId = payload.from || payload.key?.remoteJid;
     const hasMedia = payload.hasMedia || !!(payload.message?.imageMessage);
 
     console.log('[WAHA Webhook] Message context:', { chatId, fromMe, messageId, hasMedia });
 
     if (!chatId || !messageId) {
-        console.error('[WAHA Webhook] Error: Could not determine chatId or messageId from payload structure');
+        console.error('[WAHA Webhook] Error: Could not determine chatId or messageId from payload');
         return res.status(200).json({ status: 'error', reason: 'malformed_payload' });
     }
 
@@ -92,15 +92,50 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!wahaKey) console.warn('[DEBUG] ENV WAHA_API_KEY is missing');
 
         // 3. Download Media
-        console.log(`[WAHA Webhook] Step 3: Downloading media for ID ${messageId} from ${wahaUrl}`);
-        const mediaResponse = await fetch(`${wahaUrl}/api/${session}/messages/${messageId}/download`, {
+        let downloadUrl: string | null = null;
+
+        // Optimization: check if media URL is already in the payload
+        if (payload.media?.url) {
+            downloadUrl = payload.media.url.startsWith('http')
+                ? payload.media.url
+                : `${wahaUrl.replace(/\/$/, '')}${payload.media.url}`;
+            console.log('[WAHA Webhook] Using media URL from payload:', downloadUrl);
+        } else {
+            // Fallback: Fetch message details to get the media URL
+            console.log('[WAHA Webhook] media.url missing in payload, fetching message details...');
+            const msgInfoRes = await fetch(`${wahaUrl.replace(/\/$/, '')}/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${messageId}?downloadMedia=true`, {
+                headers: { 'X-Api-Key': wahaKey || '' }
+            });
+
+            if (msgInfoRes.ok) {
+                const msgInfo = await msgInfoRes.json();
+                const remoteMediaUrl = msgInfo.media?.url;
+                if (remoteMediaUrl) {
+                    downloadUrl = remoteMediaUrl.startsWith('http')
+                        ? remoteMediaUrl
+                        : `${wahaUrl.replace(/\/$/, '')}${remoteMediaUrl}`;
+                    console.log('[WAHA Webhook] Retrieved media URL via API:', downloadUrl);
+                }
+            } else {
+                console.warn('[WAHA Webhook] Failed to fetch message details:', msgInfoRes.status);
+            }
+        }
+
+        // If still no URL, try the direct message download endpoint (some engines support this)
+        if (!downloadUrl) {
+            downloadUrl = `${wahaUrl.replace(/\/$/, '')}/api/${session}/messages/${messageId}/download`;
+            console.log('[WAHA Webhook] Falling back to direct /download endpoint (Legacy):', downloadUrl);
+        }
+
+        console.log('[WAHA Webhook] Step 3: Downloading media file...');
+        const mediaResponse = await fetch(downloadUrl, {
             headers: { 'X-Api-Key': wahaKey || '' }
         });
 
         if (!mediaResponse.ok) {
             const errText = await mediaResponse.text();
-            console.error('[WAHA Webhook] Media download failed status:', mediaResponse.status, errText);
-            throw new Error(`Media download failed: ${mediaResponse.statusText}`);
+            console.error('[WAHA Webhook] Media download failed status:', mediaResponse.status, errText, 'URL:', downloadUrl);
+            throw new Error(`Media download failed: ${mediaResponse.statusText} (${mediaResponse.status})`);
         }
 
         const buffer = await mediaResponse.arrayBuffer();
@@ -123,11 +158,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 console.log('[WAHA Webhook] Refreshing Google Token...');
                 const googleToken = await refreshGoogleToken(config.rt);
 
-                const dateParts = analysis.date.split('-'); // YYYY-MM-DD
-                const year = dateParts[0] || new Date().getFullYear().toString();
-                const monthIdx = parseInt(dateParts[1]) - 1 || new Date().getMonth();
+                const dateParts = (analysis.date || new Date().toISOString().split('T')[0]).split('-');
+                const year = dateParts[0];
+                const monthIdx = parseInt(dateParts[1]) - 1;
                 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                const monthName = months[monthIdx];
+                const monthName = months[monthIdx] || 'Unknown';
 
                 console.log('[WAHA Webhook] Ensuring Drive folders exist...');
                 const rootId = await findOrCreateFolder(googleToken, 'Escher Finance Manager');
@@ -175,7 +210,7 @@ shop *Merchant:* ${analysis.merchant}
 
 ${logStatus}`;
 
-        const replyRes = await fetch(`${wahaUrl}/api/sendText`, {
+        const replyRes = await fetch(`${wahaUrl.replace(/\/$/, '')}/api/sendText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
             body: JSON.stringify({ chatId, text: report, session })
@@ -193,7 +228,7 @@ ${logStatus}`;
         console.error('[WAHA Webhook] Top-level Error:', error);
         try {
             console.log('[WAHA Webhook] Attempting to send error message to WhatsApp...');
-            await fetch(`${config.w}/api/sendText`, {
+            await fetch(`${config.w.replace(/\/$/, '')}/api/sendText`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Api-Key': process.env.WAHA_API_KEY || '' },
                 body: JSON.stringify({ chatId, text: `❌ *Error:* ${error.message}`, session: config.s || 'default' })
