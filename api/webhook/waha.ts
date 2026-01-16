@@ -35,20 +35,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const body = req.body;
-    console.log('[WAHA Webhook] Event Type:', body.event);
+    const eventName = body.event;
+    console.log('[WAHA Webhook] Event Name:', eventName);
 
-    // Support both message.upsert and generic message events
-    if (body.event !== 'message.upsert' && body.event !== 'message') {
+    // Filter only message events
+    if (eventName !== 'message' && eventName !== 'message.any' && eventName !== 'message.upsert') {
+        console.log('[WAHA Webhook] Ignoring non-message event:', eventName);
         return res.status(200).json({ status: 'ignored' });
     }
 
-    const message = body.data;
-    const chatId = message.key?.remoteJid;
-    const fromMe = message.key?.fromMe;
+    // WAHA structures vary by engine/version. We try to find the normalized data first.
+    // Based on docs: body.payload is the standard for 'message' events.
+    const payload = body.payload || body.data || body;
 
-    console.log('[WAHA Webhook] Message from:', chatId, 'FromMe:', fromMe);
+    const chatId = payload.from || payload.key?.remoteJid;
+    const fromMe = payload.fromMe || payload.key?.fromMe;
+    const messageId = payload.id || payload.key?.id;
+    const hasMedia = payload.hasMedia || !!(payload.message?.imageMessage);
 
-    if (fromMe) {
+    console.log('[WAHA Webhook] Message context:', { chatId, fromMe, messageId, hasMedia });
+
+    if (!chatId || !messageId) {
+        console.error('[WAHA Webhook] Error: Could not determine chatId or messageId from payload structure');
+        return res.status(200).json({ status: 'error', reason: 'malformed_payload' });
+    }
+
+    if (fromMe && eventName !== 'message.any') {
         console.log('[WAHA Webhook] Ignoring message from self');
         return res.status(200).json({ status: 'ignored' });
     }
@@ -63,9 +75,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('[WAHA Webhook] Authorized sender verified');
     }
 
-    const imageMsg = message.message?.imageMessage || message.message?.viewOnceMessageV2?.message?.imageMessage;
-    if (!imageMsg) {
-        console.log('[WAHA Webhook] Ignoring non-image message');
+    if (!hasMedia) {
+        console.log('[WAHA Webhook] Ignoring message without media');
         return res.status(200).json({ status: 'ignored' });
     }
 
@@ -81,8 +92,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!wahaKey) console.warn('[DEBUG] ENV WAHA_API_KEY is missing');
 
         // 3. Download Media
-        console.log('[WAHA Webhook] Step 3: Downloading media from WAHA...');
-        const mediaResponse = await fetch(`${wahaUrl}/api/${session}/messages/${message.key.id}/download`, {
+        console.log(`[WAHA Webhook] Step 3: Downloading media for ID ${messageId} from ${wahaUrl}`);
+        const mediaResponse = await fetch(`${wahaUrl}/api/${session}/messages/${messageId}/download`, {
             headers: { 'X-Api-Key': wahaKey || '' }
         });
 
@@ -94,8 +105,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const buffer = await mediaResponse.arrayBuffer();
         const base64Image = Buffer.from(buffer).toString('base64');
-        const mimeType = imageMsg.mimetype || 'image/jpeg';
-        console.log('[WAHA Webhook] Media downloaded successfully. Size:', buffer.byteLength, 'bytes');
+        const mimeType = mediaResponse.headers.get('content-type') || 'image/jpeg';
+        console.log('[WAHA Webhook] Media downloaded successfully. Mime:', mimeType, 'Size:', buffer.byteLength, 'bytes');
 
         // 4. Analyze with Gemini
         console.log('[WAHA Webhook] Step 4: Analyzing receipt with Gemini...');
@@ -112,15 +123,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 console.log('[WAHA Webhook] Refreshing Google Token...');
                 const googleToken = await refreshGoogleToken(config.rt);
 
-                const date = new Date(analysis.date || new Date());
-                const year = date.getFullYear().toString();
+                const dateParts = analysis.date.split('-'); // YYYY-MM-DD
+                const year = dateParts[0] || new Date().getFullYear().toString();
+                const monthIdx = parseInt(dateParts[1]) - 1 || new Date().getMonth();
                 const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                const month = months[date.getMonth()];
+                const monthName = months[monthIdx];
 
                 console.log('[WAHA Webhook] Ensuring Drive folders exist...');
                 const rootId = await findOrCreateFolder(googleToken, 'Escher Finance Manager');
                 const yearId = await findOrCreateFolder(googleToken, year, rootId);
-                const monthId = await findOrCreateFolder(googleToken, month, yearId);
+                const monthId = await findOrCreateFolder(googleToken, monthName, yearId);
 
                 // Upload Original To Drive
                 console.log('[WAHA Webhook] Uploading image to Google Drive...');
@@ -149,7 +161,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 logStatus = `⚠️ Analyzed but Logging Failed: ${logError.message}`;
             }
         } else {
-            console.log('[WAHA Webhook] Skipping Step 5: No Refresh Token or Spreadsheet ID in config');
+            console.log('[WAHA Webhook] Skipping Step 5: Missing rt or sid in config');
         }
 
         // 6. Report Back to WhatsApp
