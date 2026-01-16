@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { analyzeReceipt } from './_lib/analysis';
+import { analyzeReceipt } from './_lib/analysis.js';
 
 // Constants for normalization
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',

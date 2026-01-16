@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { analyzeReceipt } from '../_lib/analysis';
-import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet } from '../_lib/google';
+import { analyzeReceipt } from '../_lib/analysis.js';
+import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet } from '../_lib/google.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('[WAHA Webhook] Received request');
