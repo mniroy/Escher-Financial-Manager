@@ -159,12 +159,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 ${logStatus}`;
 
         console.log('[WAHA Webhook] Sending reply now...');
-        const replyRes = await fetch(`${wahaUrl}/api/${session}/sendText`, {
+        const replyRes = await fetch(`${wahaUrl}/api/sendText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
             body: JSON.stringify({
                 chatId,
                 text: report,
+                session,
                 linkPreview: true
             })
         });
