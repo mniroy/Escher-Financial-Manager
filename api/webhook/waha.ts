@@ -36,7 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const body = req.body;
     console.log('[WAHA Webhook] Event Type:', body.event);
-    if (body.event !== 'message.upsert') {
+
+    // Support both message.upsert and generic message events
+    if (body.event !== 'message.upsert' && body.event !== 'message') {
         return res.status(200).json({ status: 'ignored' });
     }
 
