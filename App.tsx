@@ -31,10 +31,6 @@ export default function App() {
   const [appMode, setAppMode] = useState<'standard' | 'yearly'>('standard');
   const [activePlan, setActivePlan] = useState<string>('');
 
-  // Global Period Filter State (Shared between Dashboard & Transactions)
-  const [globalDate, setGlobalDate] = useState(new Date());
-  const [globalViewMode, setGlobalViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
-
   // Helper to refresh notifications from storage
   const refreshNotifications = () => {
     setNotifications(getNotifications());
@@ -335,10 +331,6 @@ export default function App() {
           expenses={expenses}
           budgetItems={budgetItems}
           user={user}
-          selectedDate={globalDate}
-          setSelectedDate={setGlobalDate}
-          viewMode={globalViewMode}
-          setViewMode={setGlobalViewMode}
         />
       )}
       {activeTab === 'input' && (
@@ -361,8 +353,6 @@ export default function App() {
           expenses={expenses}
           onEditExpense={handleEditExpense}
           onDeleteExpense={handleDeleteExpense}
-          globalDate={globalDate}
-          globalViewMode={globalViewMode}
         />
       )}
       {activeTab === 'chat' && (

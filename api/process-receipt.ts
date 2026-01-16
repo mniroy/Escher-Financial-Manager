@@ -30,6 +30,8 @@ function cleanBase64(base64: string): string {
 // Gemini AI Analysis
 async function analyzeReceipt(base64Image: string, mimeType: string, apiKey: string): Promise<AnalysisResult> {
     const cleanData = cleanBase64(base64Image);
+    const currentDate = new Date().toISOString().split('T')[0];
+
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -38,9 +40,15 @@ async function analyzeReceipt(base64Image: string, mimeType: string, apiKey: str
                 parts: [
                     { inlineData: { mimeType, data: cleanData } },
                     {
-                        text: `Analyze this receipt. Extract total amount, merchant, date, category.
-CRITICAL: Indonesian Rupiah - dots are THOUSAND separators (Rp134.100 = 134100).
-Categories: ${BUDGET_CATEGORIES.join(', ')}. Return JSON: {"amount": number, "merchant": string, "date": "YYYY-MM-DD", "category": string}`
+                        text: `Analyze this receipt. Extract total amount, merchant, date, and category.
+                        
+CONTEXT:
+- Today's date is ${currentDate}.
+- Use this as reference when parsing the year (e.g., if you see "26", it's likely 2026).
+- CRITICAL: Indonesian Rupiah - dots are THOUSAND separators (Rp134.100 = 134100).
+- Categories: ${BUDGET_CATEGORIES.join(', ')}.
+
+Return JSON: {"amount": number, "merchant": string, "date": "YYYY-MM-DD", "category": string}`
                     }
                 ]
             }],
