@@ -9,16 +9,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const configRaw = req.query.c as string;
-    if (!configRaw) {
-        return res.status(401).json({ error: 'Missing configuration' });
+    // Get config from environment variables
+    const wahaUrl = process.env.WAHA_API_URL?.replace(/\/$/, '');
+    const wahaKey = process.env.WAHA_API_KEY;
+    const session = process.env.WAHA_SESSION || 'default';
+    const allowedSenders = process.env.WAHA_ALLOWED_SENDERS;
+
+    if (!wahaUrl) {
+        console.error('[WAHA Webhook] Missing WAHA_API_URL env');
+        return res.status(500).json({ error: 'Server misconfigured' });
     }
 
-    let config: { w: string; s: string; a: string; rt?: string; sid?: string; };
-    try {
-        config = JSON.parse(Buffer.from(configRaw, 'base64').toString());
-    } catch (e) {
-        return res.status(400).json({ error: 'Invalid configuration' });
+    // Get user-specific config from query (refresh token, spreadsheet ID)
+    let userConfig: { rt?: string; sid?: string } = {};
+    const configRaw = req.query.c as string;
+    if (configRaw) {
+        try {
+            userConfig = JSON.parse(Buffer.from(configRaw, 'base64').toString());
+        } catch (e) {
+            console.warn('[WAHA Webhook] Could not decode user config');
+        }
     }
 
     const body = req.body;
@@ -42,8 +52,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ status: 'ignored' });
     }
 
-    if (config.a) {
-        const allowed = config.a.split(',').map(id => id.trim());
+    // Sender filter from env
+    if (allowedSenders) {
+        const allowed = allowedSenders.split(',').map(id => id.trim());
         if (!allowed.includes(chatId)) {
             return res.status(200).json({ status: 'ignored' });
         }
@@ -57,16 +68,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const geminiKey = process.env.API_KEY;
-        const wahaUrl = config.w.replace(/\/$/, '');
-        const wahaKey = process.env.WAHA_API_KEY;
-        const session = config.s || 'default';
 
         // --- 3. Download Media ---
         let downloadUrl: string | null = null;
         if (payload.media?.url) {
             downloadUrl = payload.media.url.startsWith('http') ? payload.media.url : `${wahaUrl}${payload.media.url}`;
         } else {
-            // Try API Query first
             const msgInfoRes = await fetch(`${wahaUrl}/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${messageId}?downloadMedia=true`, {
                 headers: { 'X-Api-Key': wahaKey || '' }
             });
@@ -88,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
 
         if (!mediaResponse.ok) {
-            console.error('[WAHA Webhook] Media download failed status:', mediaResponse.status, 'Target:', downloadUrl);
+            console.error('[WAHA Webhook] Media download failed:', mediaResponse.status, downloadUrl);
             throw new Error(`Media download failed: ${mediaResponse.statusText}`);
         }
 
@@ -103,9 +110,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let logStatus = 'Not Logged';
 
         // --- 5. LOGGING ---
-        if (config.rt && config.sid) {
+        if (userConfig.rt && userConfig.sid) {
             try {
-                const googleToken = await refreshGoogleToken(config.rt);
+                const googleToken = await refreshGoogleToken(userConfig.rt);
                 const dateParts = (analysis.date || new Date().toISOString().split('T')[0]).split('-');
                 const rootId = await findOrCreateFolder(googleToken, 'Escher Finance Manager');
                 const yearId = await findOrCreateFolder(googleToken, dateParts[0], rootId);
@@ -117,7 +124,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const receiptUrl = await uploadToDrive(googleToken, monthId, base64Image, fileName, mimeType);
 
                 const id = `${analysis.date.replace(/-/g, '')}-${analysis.category.replace(/\s+/g, '')}-${analysis.merchant.toLowerCase().substring(0, 10)}`;
-                await appendToSheet(googleToken, config.sid, 'Expenses!A2', [
+                await appendToSheet(googleToken, userConfig.sid, 'Expenses!A2', [
                     id, analysis.date, analysis.category, analysis.merchant, analysis.amount, receiptUrl, ''
                 ]);
                 logStatus = '✅ Logged to Sheets & Drive';
@@ -128,26 +135,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // --- 6. REPLY ---
-        // Add delay to let WAHA engine stabilize (matches n8n latency)
         console.log('[WAHA Webhook] Step 6: Waiting 3s before reply...');
         await new Promise(r => setTimeout(r, 3000));
 
-        // Try to mark chat as seen first to prevent markedUnread crash
         try {
-            console.log('[WAHA Webhook] Marking chat as seen...');
             await fetch(`${wahaUrl}/api/sendSeen`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
-                body: JSON.stringify({
-                    chatId,
-                    session,
-                    messageIds: [messageId]
-                })
+                body: JSON.stringify({ chatId, session, messageIds: [messageId] })
             });
-            // Small delay after marking seen
             await new Promise(r => setTimeout(r, 500));
         } catch (e) {
-            console.warn('[WAHA Webhook] sendSeen failed, continuing anyway');
+            console.warn('[WAHA Webhook] sendSeen failed');
         }
 
         const report = `📄 *Receipt Analyzed*
@@ -158,21 +157,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 ${logStatus}`;
 
-        console.log('[WAHA Webhook] Sending reply now...');
+        console.log('[WAHA Webhook] Sending reply...');
         const replyRes = await fetch(`${wahaUrl}/api/sendText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
-            body: JSON.stringify({
-                chatId,
-                text: report,
-                session,
-                linkPreview: true
-            })
+            body: JSON.stringify({ chatId, text: report, session, linkPreview: true })
         });
 
         if (!replyRes.ok) {
-            const errBody = await replyRes.text();
-            console.error('[WAHA Webhook] Send error:', errBody);
+            console.error('[WAHA Webhook] Send error:', await replyRes.text());
         } else {
             console.log('[WAHA Webhook] Reply sent.');
         }

@@ -7,7 +7,7 @@ import ChatAssistant from './components/ChatAssistant';
 import TransactionList from './components/TransactionList';
 import NotificationPage from './components/NotificationPage';
 import Login from './components/Login';
-import Settings from './components/Settings';
+
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
@@ -20,7 +20,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
@@ -395,11 +395,7 @@ export default function App() {
           onNotificationsChange={refreshNotifications}
         />
       )}
-      {activeTab === 'settings' && (
-        <div className="flex-1 overflow-y-auto w-full">
-          <Settings />
-        </div>
-      )}
+
     </Layout>
   );
 }

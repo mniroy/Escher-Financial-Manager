@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Download, RefreshCw, LogOut, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Bell, Settings as SettingsIcon } from 'lucide-react';
+import { Download, RefreshCw, LogOut, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Bell, Link2 } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications' | 'settings') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
@@ -180,12 +180,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             <LayoutGrid className="w-5 h-5" />
           </button>
 
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`p-2 -ml-2 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
-          >
-            <SettingsIcon className="w-5 h-5" />
-          </button>
+
 
           {/* Page Title */}
           <h1 className="text-base font-semibold text-gray-900">
@@ -195,13 +190,13 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             {activeTab === 'budget' && 'Budget'}
             {activeTab === 'chat' && 'Assistant'}
             {activeTab === 'notifications' && 'Notifications'}
-            {activeTab === 'settings' && 'Settings'}
+
           </h1>
 
           {/* Notification Icon */}
           <button
             onClick={() => setActiveTab('notifications')}
-            className="p-2 -mr-2 text-gray-700 hover:bg-gray-100 rounded-lg relative"
+            className="p-2 text-gray-700 hover:bg-gray-100 rounded-lg relative"
           >
             <Bell className="w-5 h-5" />
             {unreadNotificationCount > 0 && (
@@ -209,6 +204,35 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
                 {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
               </span>
             )}
+          </button>
+
+          {/* Copy Webhook URL */}
+          <button
+            onClick={() => {
+              const refreshToken = localStorage.getItem('refreshToken');
+              const spreadsheetId = localStorage.getItem('spreadsheetId') || prompt('Enter your Spreadsheet ID:');
+              if (!refreshToken) {
+                alert('Please log in first to generate webhook URL');
+                return;
+              }
+              if (!spreadsheetId) {
+                alert('Spreadsheet ID is required');
+                return;
+              }
+              localStorage.setItem('spreadsheetId', spreadsheetId);
+              const config = { rt: refreshToken, sid: spreadsheetId };
+              const encoded = btoa(JSON.stringify(config));
+              const url = `${window.location.origin}/api/webhook/waha?c=${encoded}`;
+              navigator.clipboard.writeText(url).then(() => {
+                alert('Webhook URL copied to clipboard!');
+              }).catch(() => {
+                prompt('Copy this URL:', url);
+              });
+            }}
+            className="p-2 -mr-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+            title="Copy Webhook URL"
+          >
+            <Link2 className="w-5 h-5" />
           </button>
         </div>
       </header >
