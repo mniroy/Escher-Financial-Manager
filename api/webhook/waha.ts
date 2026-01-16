@@ -84,7 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     try {
         const geminiKey = process.env.API_KEY;
-        const wahaUrl = config.w;
+        const wahaUrl = config.w.replace(/\/$/, '');
         const wahaKey = process.env.WAHA_API_KEY;
         const session = config.s || 'default';
 
@@ -94,16 +94,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 3. Download Media
         let downloadUrl: string | null = null;
 
-        // Optimization: check if media URL is already in the payload
         if (payload.media?.url) {
-            downloadUrl = payload.media.url.startsWith('http')
-                ? payload.media.url
-                : `${wahaUrl.replace(/\/$/, '')}${payload.media.url}`;
+            downloadUrl = payload.media.url.startsWith('http') ? payload.media.url : `${wahaUrl}${payload.media.url}`;
             console.log('[WAHA Webhook] Using media URL from payload:', downloadUrl);
         } else {
-            // Fallback: Fetch message details to get the media URL
             console.log('[WAHA Webhook] media.url missing in payload, fetching message details...');
-            const msgInfoRes = await fetch(`${wahaUrl.replace(/\/$/, '')}/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${messageId}?downloadMedia=true`, {
+            const msgInfoRes = await fetch(`${wahaUrl}/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${messageId}?downloadMedia=true`, {
                 headers: { 'X-Api-Key': wahaKey || '' }
             });
 
@@ -111,118 +107,102 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const msgInfo = await msgInfoRes.json();
                 const remoteMediaUrl = msgInfo.media?.url;
                 if (remoteMediaUrl) {
-                    downloadUrl = remoteMediaUrl.startsWith('http')
-                        ? remoteMediaUrl
-                        : `${wahaUrl.replace(/\/$/, '')}${remoteMediaUrl}`;
+                    downloadUrl = remoteMediaUrl.startsWith('http') ? remoteMediaUrl : `${wahaUrl}${remoteMediaUrl}`;
                     console.log('[WAHA Webhook] Retrieved media URL via API:', downloadUrl);
                 }
-            } else {
-                console.warn('[WAHA Webhook] Failed to fetch message details:', msgInfoRes.status);
             }
         }
 
-        // If still no URL, try the direct message download endpoint (some engines support this)
         if (!downloadUrl) {
-            downloadUrl = `${wahaUrl.replace(/\/$/, '')}/api/${session}/messages/${messageId}/download`;
-            console.log('[WAHA Webhook] Falling back to direct /download endpoint (Legacy):', downloadUrl);
+            downloadUrl = `${wahaUrl}/api/${session}/messages/${messageId}/download`;
+            console.log('[WAHA Webhook] Falling back to direct /download endpoint:', downloadUrl);
         }
 
-        console.log('[WAHA Webhook] Step 3: Downloading media file...');
         const mediaResponse = await fetch(downloadUrl, {
             headers: { 'X-Api-Key': wahaKey || '' }
         });
 
         if (!mediaResponse.ok) {
-            const errText = await mediaResponse.text();
-            console.error('[WAHA Webhook] Media download failed status:', mediaResponse.status, errText, 'URL:', downloadUrl);
             throw new Error(`Media download failed: ${mediaResponse.statusText} (${mediaResponse.status})`);
         }
 
         const buffer = await mediaResponse.arrayBuffer();
         const base64Image = Buffer.from(buffer).toString('base64');
         const mimeType = mediaResponse.headers.get('content-type') || 'image/jpeg';
-        console.log('[WAHA Webhook] Media downloaded successfully. Mime:', mimeType, 'Size:', buffer.byteLength, 'bytes');
+        console.log('[WAHA Webhook] Media downloaded. Size:', buffer.byteLength);
 
-        // 4. Analyze with Gemini
-        console.log('[WAHA Webhook] Step 4: Analyzing receipt with Gemini...');
+        // 4. Analyze
         const analysis = await analyzeReceipt(base64Image, mimeType, geminiKey!);
-        console.log('[WAHA Webhook] Gemini Analysis Result:', analysis);
+        console.log('[WAHA Webhook] Analysis complete');
 
-        let logStatus = 'Not Logged (No Refresh Token)';
+        let logStatus = 'Not Logged';
 
         // 5. BACKGROUND LOGGING
         if (config.rt && config.sid) {
-            console.log('[WAHA Webhook] Step 5: Background Logging triggered');
             try {
-                // Get a fresh access token
-                console.log('[WAHA Webhook] Refreshing Google Token...');
                 const googleToken = await refreshGoogleToken(config.rt);
-
                 const dateParts = (analysis.date || new Date().toISOString().split('T')[0]).split('-');
-                const year = dateParts[0];
-                const monthIdx = parseInt(dateParts[1]) - 1;
-                const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                const monthName = months[monthIdx] || 'Unknown';
-
-                console.log('[WAHA Webhook] Ensuring Drive folders exist...');
                 const rootId = await findOrCreateFolder(googleToken, 'Escher Finance Manager');
-                const yearId = await findOrCreateFolder(googleToken, year, rootId);
+                const yearId = await findOrCreateFolder(googleToken, dateParts[0], rootId);
+
+                const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                const monthName = months[parseInt(dateParts[1]) - 1] || 'Unknown';
                 const monthId = await findOrCreateFolder(googleToken, monthName, yearId);
 
-                // Upload Original To Drive
-                console.log('[WAHA Webhook] Uploading image to Google Drive...');
                 const fileName = `receipt-${analysis.date}-${analysis.merchant.toLowerCase().replace(/[^a-z0-9]/g, '-')}.jpg`;
                 const receiptUrl = await uploadToDrive(googleToken, monthId, base64Image, fileName, mimeType);
-                console.log('[WAHA Webhook] Drive URL:', receiptUrl);
 
-                // Append to Sheet
-                console.log('[WAHA Webhook] Appending row to Google Sheets...');
                 const id = `${analysis.date.replace(/-/g, '')}-${analysis.category.replace(/\s+/g, '')}-${analysis.merchant.toLowerCase().substring(0, 10)}`;
-
                 await appendToSheet(googleToken, config.sid, 'Expenses!A2', [
-                    id,
-                    analysis.date,
-                    analysis.category,
-                    analysis.merchant,
-                    analysis.amount,
-                    receiptUrl,
-                    ''
+                    id, analysis.date, analysis.category, analysis.merchant, analysis.amount, receiptUrl, ''
                 ]);
 
-                console.log('[WAHA Webhook] Sheet append successful');
                 logStatus = '✅ Successfully Logged to Google Sheets & Drive';
-            } catch (logError: any) {
-                console.error('[WAHA Webhook] Background logging error:', logError);
-                logStatus = `⚠️ Analyzed but Logging Failed: ${logError.message}`;
+            } catch (err: any) {
+                logStatus = `⚠️ Analyzed but Logging Failed: ${err.message}`;
             }
-        } else {
-            console.log('[WAHA Webhook] Skipping Step 5: Missing rt or sid in config');
         }
 
-        // 6. Report Back to WhatsApp
+        // 6. Report Back (with "Typing" pre-warm to fix markedUnread crash)
         console.log('[WAHA Webhook] Step 6: Sending WhatsApp reply...');
+
+        // Strategy: Send "Typing" status first to warn the browser engine we are about to message this chat
+        try {
+            await fetch(`${wahaUrl}/api/${session}/presence`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
+                body: JSON.stringify({ chatId, presence: 'typing' })
+            });
+            // Small sleep to allow engine to stabilize
+            await new Promise(r => setTimeout(r, 800));
+        } catch (e) {
+            console.warn('[WAHA Webhook] Failed to set presence typing, continuing anyway.');
+        }
+
         const report = `📄 *Receipt Analyzed*
 
 💰 *Amount:* Rp ${analysis.amount.toLocaleString('id-ID')}
-shop *Merchant:* ${analysis.merchant}
+🏪 *Merchant:* ${analysis.merchant}
 📅 *Date:* ${analysis.date}
 📂 *Category:* ${analysis.category}
 
 ${logStatus}`;
 
-        const replyRes = await fetch(`${wahaUrl.replace(/\/$/, '')}/api/sendText`, {
+        const replyRes = await fetch(`${wahaUrl}/api/sendText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
             body: JSON.stringify({
                 chatId,
                 text: report,
                 session,
-                linkPreview: false // Disable to prevent engine crash on Drive links
+                linkPreview: false,
+                reply_to: messageId // Use explicit reply_to to help engine focus on the chat
             })
         });
 
         if (!replyRes.ok) {
-            console.error('[WAHA Webhook] Failed to send WhatsApp reply:', await replyRes.text());
+            const errBody = await replyRes.text();
+            console.error('[WAHA Webhook] Failed to send reply. Status:', replyRes.status, 'Body:', errBody);
         } else {
             console.log('[WAHA Webhook] WhatsApp reply sent successfully');
         }
@@ -231,16 +211,6 @@ ${logStatus}`;
 
     } catch (error: any) {
         console.error('[WAHA Webhook] Top-level Error:', error);
-        try {
-            console.log('[WAHA Webhook] Attempting to send error message to WhatsApp...');
-            await fetch(`${config.w.replace(/\/$/, '')}/api/sendText`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Api-Key': process.env.WAHA_API_KEY || '' },
-                body: JSON.stringify({ chatId, text: `❌ *Error:* ${error.message}`, session: config.s || 'default' })
-            });
-        } catch (e) {
-            console.error('[WAHA Webhook] Failed to send error message to WhatsApp:', e);
-        }
         return res.status(500).json({ error: error.message });
     }
 }
