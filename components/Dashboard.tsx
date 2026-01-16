@@ -33,15 +33,21 @@ interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
   user: User;
+  selectedDate: Date;
+  setSelectedDate: React.Dispatch<React.SetStateAction<Date>>;
+  viewMode: 'monthly' | 'yearly-only' | 'yearly';
+  setViewMode: React.Dispatch<React.SetStateAction<'monthly' | 'yearly-only' | 'yearly'>>;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
   expenses,
   budgetItems,
-  user
+  user,
+  selectedDate,
+  setSelectedDate,
+  viewMode,
+  setViewMode
 }) => {
-  const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedAnnualPlan, setSelectedAnnualPlan] = useState<string | null>(null);
 
   // Get list of yearly budget items for the plan selector

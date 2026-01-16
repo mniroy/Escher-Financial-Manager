@@ -8,27 +8,38 @@ interface TransactionListProps {
     expenses: Expense[];
     onEditExpense: (expense: Expense) => Promise<void>;
     onDeleteExpense: (expenseId: string) => Promise<void>;
+    globalDate: Date;
+    globalViewMode: 'monthly' | 'yearly-only' | 'yearly';
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
     expenses,
     onEditExpense,
     onDeleteExpense,
+    globalDate,
+    globalViewMode
 }) => {
-    const [selectedDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(globalDate);
     const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
-    const [chartRange, setChartRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('1M');
+    const [chartRange, setChartRange] = useState<'1D' | '1W' | 'MONTH' | '3M' | '1Y' | 'ALL'>('MONTH');
     const [showChart, setShowChart] = useState(true);
+
+    // Keep selectedDate in sync with globalDate if chartRange is MONTH
+    React.useEffect(() => {
+        if (chartRange === 'MONTH') {
+            setSelectedDate(globalDate);
+        }
+    }, [globalDate, chartRange]);
 
     // Get days for range
     const getRangeDays = (range: typeof chartRange) => {
         switch (range) {
             case '1D': return 1;
             case '1W': return 7;
-            case '1M': return 30;
+            case 'MONTH': return 30; // Not used directly for MONTH case
             case '3M': return 90;
             case '1Y': return 365;
             case 'ALL': return 9999;
@@ -38,15 +49,27 @@ const TransactionList: React.FC<TransactionListProps> = ({
     // Filter expenses based on chartRange
     const filteredExpenses = useMemo(() => {
         const today = selectedDate;
-        const days = getRangeDays(chartRange);
 
         return expenses.filter(e => {
             const d = new Date(e.date);
-            const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+
+            // If we are in MONTH mode, we either follow the global filter or the global year
+            if (chartRange === 'MONTH') {
+                if (globalViewMode === 'monthly') {
+                    return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+                } else if (globalViewMode === 'yearly' || globalViewMode === 'yearly-only') {
+                    // In yearly modes, showing the whole year is more "correct" for the transaction tab
+                    return d.getFullYear() === today.getFullYear();
+                }
+            }
+
             if (chartRange === 'ALL') return true;
+
+            const days = getRangeDays(chartRange);
+            const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
             return diffDays >= 0 && diffDays < days;
         });
-    }, [expenses, chartRange, selectedDate]);
+    }, [expenses, chartRange, selectedDate, globalViewMode]);
 
     // Sort expenses
     const sortedExpenses = useMemo(() => {
@@ -67,7 +90,9 @@ const TransactionList: React.FC<TransactionListProps> = ({
         switch (chartRange) {
             case '1D': days = 1; break;
             case '1W': days = 7; break;
-            case '1M': days = 30; break;
+            case 'MONTH':
+                days = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+                break;
             case '3M': days = 90; break;
             case '1Y': days = 365; break;
             case 'ALL': days = 9999; break;
@@ -197,20 +222,29 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 </div>
 
                 {/* Range Selector */}
-                <div className="flex justify-around mb-3 border-b border-gray-100 pb-2">
-                    {(['1D', '1W', '1M', '3M', '1Y', 'ALL'] as const).map((range) => (
+                <div className="flex justify-around mb-2 border-b border-gray-100 pb-2">
+                    {(['1D', '1W', 'MONTH', '3M', '1Y', 'ALL'] as const).map((range) => (
                         <button
                             key={range}
                             onClick={() => setChartRange(range)}
                             className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${chartRange === range
-                                ? 'bg-gray-100 text-gray-900 border border-gray-300'
+                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 shadow-sm'
                                 : 'text-gray-500 hover:text-gray-700'
                                 }`}
                         >
-                            {range}
+                            {range === 'MONTH' ? 'Month' : range}
                         </button>
                     ))}
                 </div>
+
+                {chartRange === 'MONTH' && (
+                    <div className="text-[10px] text-center text-indigo-500 font-medium mb-2 uppercase tracking-tight">
+                        Viewing {globalViewMode === 'monthly'
+                            ? selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })
+                            : `Full Year ${selectedDate.getFullYear()}`
+                        }
+                    </div>
+                )}
 
                 {/* Chart */}
                 {showChart && (
