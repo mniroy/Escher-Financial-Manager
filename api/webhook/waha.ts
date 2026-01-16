@@ -37,8 +37,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const wahaKey = config.k;
         const session = config.s || 'default';
 
-        // 3. Download Media
-        const mediaResponse = await fetch(`${wahaUrl}/api/${session}/messages/${message.key.id}/download`, {
+        // 3. Download Media for Analysis
+        const messageId = message.key.id;
+        const mediaResponse = await fetch(`${wahaUrl}/api/${session}/messages/${messageId}/download`, {
             headers: { 'X-Api-Key': wahaKey || '' }
         });
         if (!mediaResponse.ok) throw new Error(`Media download failed: ${mediaResponse.statusText}`);
@@ -51,9 +52,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const analysis = await analyzeReceipt(base64Image, mimeType, geminiKey!);
 
         // 5. Trigger Push Notification to App
+        // NOTE: We don't send the full base64 in the push payload (4KB limit).
+        // Instead, the app will download it from WAHA using the messageId.
         if (config.ps) {
             try {
-                // Determine absolute URL (use req.headers.host or a fallback)
                 const host = req.headers.host || 'escher-financial-manager.vercel.app';
                 const protocol = host.includes('localhost') ? 'http' : 'https';
                 const appUrl = `${protocol}://${host}`;
@@ -65,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         subscription: config.ps,
                         title: 'Receipt Analyzed!',
                         body: `Detected Rp ${analysis.amount.toLocaleString()} at ${analysis.merchant}. Tap to log it!`,
-                        url: `/?wa_expense=${btoa(JSON.stringify({ ...analysis, base64Image, mimeType }))}`
+                        url: `/?wa_expense=${btoa(JSON.stringify({ ...analysis, messageId, mimeType }))}`
                     })
                 });
             } catch (pError) {

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, CreditCard, Plane } from 'lucide-react';
 import { fileToGenerativePart, analyzeReceipt } from '../services/geminiService';
+import { getWahaConfig } from '../services/wahaService';
 import { BudgetCategory, Expense, BudgetLineItem } from '../types';
 import { formatCurrency } from '../constants';
 
@@ -46,11 +47,11 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
         setTasks(prev => [{
             id: taskId,
             status: 'processing',
-            message: 'Processing WhatsApp receipt...'
+            message: 'Logging WhatsApp receipt...'
         }, ...prev]);
 
         try {
-            const { amount, merchant, date, category, base64Image, mimeType } = data;
+            const { amount, merchant, date, category, base64Image, messageId, mimeType } = data;
 
             const finalCategory = activeYearlyPlan ? activeYearlyPlan.category : (category as BudgetCategory);
             const finalPlanName = activeYearlyPlan ? activeYearlyPlan.name : undefined;
@@ -64,9 +65,39 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
             const receiptFileName = `receipt-${expenseId}.${mimeType?.split('/')[1] || 'jpg'}`;
             let receiptUrl = '';
 
-            if (base64Image) {
+            let finalBase64 = base64Image;
+
+            // If we have a messageId but no base64 (standard bridge flow), fetch from WAHA
+            if (messageId && !finalBase64) {
+                const waha = getWahaConfig();
+                if (waha.apiUrl) {
+                    try {
+                        const wUrl = `${waha.apiUrl}/api/${waha.session || 'default'}/messages/${messageId}/download`;
+                        const res = await fetch(wUrl, {
+                            headers: { 'X-Api-Key': waha.apiKey || '' }
+                        });
+                        if (res.ok) {
+                            const buffer = await res.arrayBuffer();
+                            const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
+                            // Convert to base64 for Drive upload
+                            const reader = new FileReader();
+                            finalBase64 = await new Promise((resolve) => {
+                                reader.onloadend = () => {
+                                    const base64 = reader.result as string;
+                                    resolve(base64.split(',')[1]);
+                                };
+                                reader.readAsDataURL(blob);
+                            });
+                        }
+                    } catch (e) {
+                        console.error("Failed to fetch image from WAHA", e);
+                    }
+                }
+            }
+
+            if (finalBase64) {
                 try {
-                    receiptUrl = await onUploadReceipt(base64Image, mimeType, receiptFileName, expenseDate);
+                    receiptUrl = await onUploadReceipt(finalBase64, mimeType || 'image/jpeg', receiptFileName, expenseDate);
                 } catch (e) {
                     console.warn('Failed upload', e);
                     receiptUrl = 'upload-failed';
