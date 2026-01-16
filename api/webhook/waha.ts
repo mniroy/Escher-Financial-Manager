@@ -132,6 +132,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         console.log('[WAHA Webhook] Step 6: Waiting 3s before reply...');
         await new Promise(r => setTimeout(r, 3000));
 
+        // Try to mark chat as seen first to prevent markedUnread crash
+        try {
+            console.log('[WAHA Webhook] Marking chat as seen...');
+            await fetch(`${wahaUrl}/api/sendSeen`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
+                body: JSON.stringify({
+                    chatId,
+                    session,
+                    messageIds: [messageId]
+                })
+            });
+            // Small delay after marking seen
+            await new Promise(r => setTimeout(r, 500));
+        } catch (e) {
+            console.warn('[WAHA Webhook] sendSeen failed, continuing anyway');
+        }
+
         const report = `📄 *Receipt Analyzed*
 💰 Rp ${analysis.amount.toLocaleString('id-ID')}
 🏪 ${analysis.merchant}
@@ -141,14 +159,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 ${logStatus}`;
 
         console.log('[WAHA Webhook] Sending reply now...');
-        const replyRes = await fetch(`${wahaUrl}/api/sendText`, {
+        const replyRes = await fetch(`${wahaUrl}/api/${session}/sendText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
             body: JSON.stringify({
                 chatId,
                 text: report,
-                session,
-                linkPreview: true  // Match n8n config
+                linkPreview: true
             })
         });
 
