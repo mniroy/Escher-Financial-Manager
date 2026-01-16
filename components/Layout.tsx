@@ -209,17 +209,24 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
           {/* Copy Webhook URL */}
           <button
             onClick={() => {
-              const refreshToken = localStorage.getItem('refreshToken');
-              const spreadsheetId = localStorage.getItem('spreadsheetId') || prompt('Enter your Spreadsheet ID:');
+              const userSession = localStorage.getItem('escher_user_session');
+              let refreshToken = '';
+              if (userSession) {
+                try {
+                  const parsed = JSON.parse(userSession);
+                  refreshToken = parsed.refreshToken || '';
+                } catch (e) { }
+              }
+              const spreadsheetId = localStorage.getItem('escher_spreadsheet_id') || prompt('Enter your Spreadsheet ID:');
               if (!refreshToken) {
-                alert('Please log in first to generate webhook URL');
+                alert('Please log in with Google first to generate webhook URL');
                 return;
               }
               if (!spreadsheetId) {
                 alert('Spreadsheet ID is required');
                 return;
               }
-              localStorage.setItem('spreadsheetId', spreadsheetId);
+              localStorage.setItem('escher_spreadsheet_id', spreadsheetId);
               const config = { rt: refreshToken, sid: spreadsheetId };
               const encoded = btoa(JSON.stringify(config));
               const url = `${window.location.origin}/api/webhook/waha?c=${encoded}`;
