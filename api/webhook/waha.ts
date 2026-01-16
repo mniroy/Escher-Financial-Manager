@@ -128,8 +128,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // --- 6. REPLY ---
-        // Simplified reply to avoid WEBJS crashes (markedUnread error)
-        console.log('[WAHA Webhook] Step 6: Sending simple reply...');
+        // Add delay to let WAHA engine stabilize (matches n8n latency)
+        console.log('[WAHA Webhook] Step 6: Waiting 3s before reply...');
+        await new Promise(r => setTimeout(r, 3000));
 
         const report = `📄 *Receipt Analyzed*
 💰 Rp ${analysis.amount.toLocaleString('id-ID')}
@@ -139,6 +140,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 ${logStatus}`;
 
+        console.log('[WAHA Webhook] Sending reply now...');
         const replyRes = await fetch(`${wahaUrl}/api/sendText`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
@@ -146,9 +148,7 @@ ${logStatus}`;
                 chatId,
                 text: report,
                 session,
-                linkPreview: false
-                // NO reply_to
-                // NO status typing pre-warm
+                linkPreview: true  // Match n8n config
             })
         });
 
