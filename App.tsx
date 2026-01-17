@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import ExpenseLogger from './components/ExpenseLogger';
@@ -100,7 +100,7 @@ export default function App() {
     setActivePlan('');
   };
 
-  const loadData = async (currentUser: User) => {
+  const loadData = useCallback(async (currentUser: User) => {
     setLoading(true);
     try {
       // Sync Budget
@@ -124,7 +124,7 @@ export default function App() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -235,6 +235,13 @@ export default function App() {
     }
   };
 
+  // Memoized refresh handler for TransactionList
+  const handleRefresh = useCallback(async () => {
+    if (user) {
+      await loadData(user);
+    }
+  }, [user, loadData]);
+
   // Show a blank screen or spinner while checking local storage to prevent login flicker
   if (isInitializing) {
     return (
@@ -298,7 +305,7 @@ export default function App() {
           expenses={expenses}
           onEditExpense={handleEditExpense}
           onDeleteExpense={handleDeleteExpense}
-          onRefresh={() => loadData(user)}
+          onRefresh={handleRefresh}
         />
       )}
       {activeTab === 'chat' && (

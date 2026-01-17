@@ -28,13 +28,29 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
     // Automatically refresh data from Google Sheets when entering this page
     useEffect(() => {
-        if (onRefresh) {
-            setIsRefreshing(true);
-            onRefresh().finally(() => {
-                setIsRefreshing(false);
-            });
-        }
-    }, []); // Empty dependency array means this runs once on mount
+        let isMounted = true;
+
+        const refreshData = async () => {
+            if (onRefresh && isMounted) {
+                setIsRefreshing(true);
+                try {
+                    await onRefresh();
+                } catch (error) {
+                    console.error('Failed to refresh transactions:', error);
+                } finally {
+                    if (isMounted) {
+                        setIsRefreshing(false);
+                    }
+                }
+            }
+        };
+
+        refreshData();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [onRefresh]); // Include onRefresh in dependencies
 
     // Get days for range
     const getRangeDays = (range: typeof chartRange) => {
