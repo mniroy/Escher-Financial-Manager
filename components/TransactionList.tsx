@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { Expense, BudgetCategory } from '../types';
 import { formatCurrency } from '../constants';
@@ -25,6 +25,16 @@ const TransactionList: React.FC<TransactionListProps> = ({
     const [isEditMode, setIsEditMode] = useState(false);
     const [chartRange, setChartRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'ALL'>('1M');
     const [showChart, setShowChart] = useState(true);
+
+    // Automatically refresh data from Google Sheets when entering this page
+    useEffect(() => {
+        if (onRefresh) {
+            setIsRefreshing(true);
+            onRefresh().finally(() => {
+                setIsRefreshing(false);
+            });
+        }
+    }, []); // Empty dependency array means this runs once on mount
 
     // Get days for range
     const getRangeDays = (range: typeof chartRange) => {
