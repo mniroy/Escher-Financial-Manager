@@ -5,11 +5,15 @@ const BASE_URL = 'https://sheets.googleapis.com/v4/spreadsheets';
 export const fetchSheetValues = async (user: User, range: string) => {
   if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
 
-  const response = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/${range}`, {
+  const url = `${BASE_URL}/${user.spreadsheetId}/values/${range}`;
+
+  const response = await fetch(url, {
     method: 'GET',
     cache: 'no-store',
     headers: {
       Authorization: `Bearer ${user.accessToken}`,
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
     },
   });
 
