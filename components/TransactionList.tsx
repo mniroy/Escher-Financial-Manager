@@ -2,19 +2,22 @@ import React, { useMemo, useState } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
 import { Expense, BudgetCategory } from '../types';
 import { formatCurrency } from '../constants';
-import { ArrowUpDown, Pencil, Trash2, X, Save, Check, BarChart3, Calendar, Plane } from 'lucide-react';
+import { ArrowUpDown, Pencil, Trash2, X, Save, Check, BarChart3, Calendar, Plane, RefreshCw } from 'lucide-react';
 
 interface TransactionListProps {
     expenses: Expense[];
     onEditExpense: (expense: Expense) => Promise<void>;
     onDeleteExpense: (expenseId: string) => Promise<void>;
+    onRefresh?: () => Promise<void>;
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
     expenses,
     onEditExpense,
     onDeleteExpense,
+    onRefresh,
 }) => {
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [selectedDate] = useState(new Date());
     const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -165,6 +168,27 @@ const TransactionList: React.FC<TransactionListProps> = ({
                 <div className="flex items-center justify-between mb-1">
                     <h2 className="text-sm font-semibold text-gray-800">Transactions</h2>
                     <div className="flex items-center gap-1">
+                        {/* Refresh Button */}
+                        {onRefresh && (
+                            <button
+                                onClick={async () => {
+                                    setIsRefreshing(true);
+                                    try {
+                                        await onRefresh();
+                                    } finally {
+                                        setIsRefreshing(false);
+                                    }
+                                }}
+                                disabled={isRefreshing}
+                                className={`p-1.5 rounded-lg transition-all ${isRefreshing
+                                    ? 'bg-indigo-100 text-indigo-400'
+                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                    }`}
+                                title="Refresh from Google Sheets"
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            </button>
+                        )}
                         {/* Chart Toggle */}
                         <button
                             onClick={() => setShowChart(!showChart)}

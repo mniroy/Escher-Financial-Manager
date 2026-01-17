@@ -38,11 +38,26 @@ export const exchangeCodeForTokens = async (code: string) => {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code })
   });
+
+  const text = await response.text();
+
   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.error || 'Failed to exchange code');
+    let errorMessage = 'Failed to exchange code';
+    try {
+      const err = JSON.parse(text);
+      errorMessage = err.error || err.error_description || errorMessage;
+    } catch {
+      // Response was not JSON (e.g., Vercel platform error)
+      errorMessage = text || `HTTP ${response.status}: ${response.statusText}`;
+    }
+    throw new Error(errorMessage);
   }
-  return await response.json();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Invalid response from server');
+  }
 };
 
 // Check if the token is expired (with 5 minute buffer)

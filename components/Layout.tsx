@@ -208,30 +208,50 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
           {/* Copy Webhook URL */}
           <button
-            onClick={() => {
+            onClick={async () => {
               const userSession = localStorage.getItem('escher_user_session');
               let refreshToken = '';
+              let spreadsheetId = '';
               if (userSession) {
                 try {
                   const parsed = JSON.parse(userSession);
                   refreshToken = parsed.refreshToken || '';
+                  spreadsheetId = parsed.spreadsheetId || '';
                 } catch (e) { }
               }
-              const spreadsheetId = localStorage.getItem('escher_spreadsheet_id') || prompt('Enter your Spreadsheet ID:');
+
               if (!refreshToken) {
                 alert('Please log in with Google first to generate webhook URL');
                 return;
               }
               if (!spreadsheetId) {
-                alert('Spreadsheet ID is required');
-                return;
+                spreadsheetId = prompt('Enter your Spreadsheet ID:') || '';
+                if (!spreadsheetId) {
+                  alert('Spreadsheet ID is required');
+                  return;
+                }
               }
-              localStorage.setItem('escher_spreadsheet_id', spreadsheetId);
-              const config = { rt: refreshToken, sid: spreadsheetId };
+
+              // Get push subscription for notifications
+              let pushSub = null;
+              const savedSub = localStorage.getItem('escher_push_subscription');
+              if (savedSub) {
+                try {
+                  pushSub = JSON.parse(savedSub);
+                } catch (e) { }
+              }
+
+              const config: any = { rt: refreshToken, sid: spreadsheetId };
+              if (pushSub) {
+                config.push = pushSub;
+              }
+
               const encoded = btoa(JSON.stringify(config));
               const url = `${window.location.origin}/api/webhook/waha?c=${encoded}`;
               navigator.clipboard.writeText(url).then(() => {
-                alert('Webhook URL copied to clipboard!');
+                alert(pushSub
+                  ? 'Webhook URL copied! Push notifications are enabled.'
+                  : 'Webhook URL copied! (Enable notifications for push alerts)');
               }).catch(() => {
                 prompt('Copy this URL:', url);
               });

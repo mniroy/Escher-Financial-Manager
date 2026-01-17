@@ -126,6 +126,36 @@ export default function App() {
       // Sync Expenses
       const expensesData = await fetchSheetValues(currentUser, 'Expenses!A:G'); // Extended range for budgetItemName
       const parsedExpenses = parseExpensesFromSheet(expensesData.values);
+
+      // Detect new expenses from external sources (e.g., WhatsApp webhook)
+      // Only check if we already have expenses loaded (not first load)
+      if (expenses.length > 0) {
+        const existingIds = new Set(expenses.map(e => e.id));
+        const newExpenses = parsedExpenses.filter(e => !existingIds.has(e.id));
+
+        // Create notifications for new expenses (likely from WhatsApp)
+        for (const newExpense of newExpenses) {
+          const notif = createNotification(
+            'receipt',
+            'whatsapp',
+            '📱 WhatsApp Receipt',
+            `${formatCurrency(newExpense.amount)} at ${newExpense.description || newExpense.category}`,
+            newExpense.id,
+            newExpense.category
+          );
+          saveNotification(notif);
+
+          // Show local notification if permission granted
+          if (isNotificationPermissionGranted()) {
+            showLocalNotification(notif.title, notif.message);
+          }
+        }
+
+        if (newExpenses.length > 0) {
+          refreshNotifications();
+        }
+      }
+
       setExpenses(parsedExpenses);
 
     } catch (error: any) {
@@ -377,6 +407,7 @@ export default function App() {
           expenses={expenses}
           onEditExpense={handleEditExpense}
           onDeleteExpense={handleDeleteExpense}
+          onRefresh={() => loadData(user)}
         />
       )}
       {activeTab === 'chat' && (

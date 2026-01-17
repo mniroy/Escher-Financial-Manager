@@ -20,8 +20,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(500).json({ error: 'Server misconfigured' });
     }
 
-    // Get user-specific config from query (refresh token, spreadsheet ID)
-    let userConfig: { rt?: string; sid?: string } = {};
+    // Get user-specific config from query (refresh token, spreadsheet ID, push subscription)
+    let userConfig: { rt?: string; sid?: string; push?: any } = {};
     const configRaw = req.query.c as string;
     if (configRaw) {
         try {
@@ -128,6 +128,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     id, analysis.date, analysis.category, analysis.merchant, analysis.amount, receiptUrl, ''
                 ]);
                 logStatus = '✅ Logged to Sheets & Drive';
+
+                // Send push notification if subscription is available
+                if (userConfig.push && userConfig.push.endpoint) {
+                    try {
+                        const webpush = await import('web-push');
+                        const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
+                        const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+
+                        if (VAPID_PRIVATE_KEY) {
+                            webpush.setVapidDetails(
+                                'mailto:escher@financial-manager.app',
+                                VAPID_PUBLIC_KEY,
+                                VAPID_PRIVATE_KEY
+                            );
+
+                            const notificationPayload = JSON.stringify({
+                                title: '📱 WhatsApp Receipt',
+                                body: `Rp ${analysis.amount.toLocaleString('id-ID')} at ${analysis.merchant}`,
+                                icon: '/icon-512.png',
+                                url: '/transactions',
+                                tag: `wa-receipt-${id}`
+                            });
+
+                            await webpush.sendNotification(userConfig.push, notificationPayload);
+                            console.log('[WAHA Webhook] Push notification sent');
+                        }
+                    } catch (pushErr: any) {
+                        console.warn('[WAHA Webhook] Push notification failed:', pushErr.message);
+                    }
+                }
             } catch (err: any) {
                 console.error('[WAHA Webhook] Logging Error:', err);
                 logStatus = `⚠️ Logging Failed: ${err.message}`;
