@@ -19,7 +19,7 @@ interface NotificationPayload {
 }
 
 // VAPID keys
-const VAPID_PUBLIC_KEY = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
+const VAPID_PUBLIC_KEY = 'BOUiCelRDI6tqCK4bPZkJgUz_rxM0svy2A9kXztJq50HHwvs4UkQKlcf8rpBhQ1WKaN6EVysOWaOv_BkQFK1BtU';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

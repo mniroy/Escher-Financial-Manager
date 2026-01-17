@@ -1,5 +1,6 @@
 import crypto from 'crypto';
-const CLIENT_ID = '691804601172-eg2ajh42fmeep7a67g48rf7ospnun11g.apps.googleusercontent.com';
+
+const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
 export async function refreshGoogleToken(refreshToken: string): Promise<string> {
     const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;

@@ -3,7 +3,7 @@ import { WahaConfig } from '../types';
 const WAHA_CONFIG_KEY = 'escher_waha_config';
 
 const DEFAULT_CONFIG: WahaConfig = {
-    apiUrl: 'https://waha.royyaninezfamily.my.id',
+    apiUrl: '', // Configure via environment or user settings
     session: 'default',
     allowedIds: ''
 };
