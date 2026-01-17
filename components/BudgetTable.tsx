@@ -328,21 +328,21 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, 
             <h3 className="text-indigo-200 text-sm font-medium uppercase tracking-wider mb-1">Total Annual Budget</h3>
             <p className="text-3xl md:text-4xl font-extrabold tracking-tight">{formatCurrency(grandTotal)}</p>
 
-            <div className="mt-4 flex items-center justify-center md:justify-start">
-              <div className="flex bg-white/5 backdrop-blur-md rounded-xl md:rounded-full px-4 py-2 border border-white/10 gap-6">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[8px] text-indigo-300 font-bold uppercase tracking-wider whitespace-nowrap">LY Net Income</span>
-                    <span className="text-xs font-bold font-mono tracking-tighter">{formatCurrency(incomeSummary.lyNet)}</span>
+            <div className="mt-4 flex items-center justify-center md:justify-start overflow-hidden">
+              <div className="flex bg-white/5 backdrop-blur-md rounded-xl md:rounded-full px-3 md:px-4 py-1.5 md:py-2 border border-white/10 gap-3 md:gap-6 max-w-full">
+                <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></div>
+                  <div className="flex flex-col leading-none min-w-0">
+                    <span className="text-[7px] md:text-[8px] text-indigo-300 font-bold uppercase tracking-wider whitespace-nowrap">LY Net Income</span>
+                    <span className="text-[10px] md:text-sm font-bold font-mono tracking-tighter truncate">{formatCurrency(incomeSummary.lyNet)}</span>
                   </div>
                 </div>
-                <div className="w-px h-4 bg-white/10 self-center"></div>
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[8px] text-emerald-300 font-bold uppercase tracking-wider whitespace-nowrap">TY YTD Net Income</span>
-                    <span className="text-xs font-bold text-emerald-50 font-mono tracking-tighter">{formatCurrency(incomeSummary.tyNet)}</span>
+                <div className="w-px h-4 bg-white/10 self-center shrink-0"></div>
+                <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></div>
+                  <div className="flex flex-col leading-none min-w-0">
+                    <span className="text-[7px] md:text-[8px] text-emerald-300 font-bold uppercase tracking-wider whitespace-nowrap">TY YTD Net Income</span>
+                    <span className="text-[10px] md:text-sm font-bold text-emerald-50 font-mono tracking-tighter truncate">{formatCurrency(incomeSummary.tyNet)}</span>
                   </div>
                 </div>
               </div>

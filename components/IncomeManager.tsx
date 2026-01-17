@@ -293,14 +293,14 @@ const IncomeManager: React.FC<Props> = ({ incomeData }) => {
 
             {/* Income Table */}
             <div className="flex-1 overflow-y-auto mt-4 px-4 pb-4">
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
                     {/* Table Header */}
-                    <div className="flex bg-gray-50 border-b border-gray-200 px-3 py-3">
-                        <div className="w-5 shrink-0"></div>
-                        <div className="w-16 shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide">Month</div>
-                        <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right pr-4">Royyan</div>
-                        <div className="flex-1 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right pr-4">Inez</div>
-                        <div className="w-28 shrink-0 text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Total</div>
+                    <div className="flex bg-gray-50 border-b border-gray-200 px-2 md:px-3 py-3 sticky top-0 z-10 rounded-t-2xl">
+                        <div className="w-4 md:w-5 shrink-0"></div>
+                        <div className="w-14 md:w-16 shrink-0 text-[10px] md:text-xs font-semibold text-gray-500 uppercase tracking-wide">Month</div>
+                        <div className="flex-1 text-[10px] md:text-xs font-semibold text-gray-500 uppercase tracking-wide text-right pr-2 md:pr-4">Royyan</div>
+                        <div className="flex-1 text-[10px] md:text-xs font-semibold text-gray-500 uppercase tracking-wide text-right pr-2 md:pr-4">Inez</div>
+                        <div className="w-24 md:w-28 shrink-0 text-[10px] md:text-xs font-semibold text-gray-500 uppercase tracking-wide text-right">Total</div>
                     </div>
 
                     {/* Table Body */}
@@ -315,25 +315,25 @@ const IncomeManager: React.FC<Props> = ({ incomeData }) => {
                                     {/* Month Row */}
                                     <div
                                         onClick={() => hasData && toggleMonth(monthData.month)}
-                                        className={`flex px-3 py-3 transition-colors ${hasData ? 'cursor-pointer hover:bg-indigo-50/50' : 'opacity-40'} ${isExpanded ? 'bg-indigo-50/70' : ''}`}
+                                        className={`flex px-2 md:px-3 py-3 transition-colors ${hasData ? 'cursor-pointer hover:bg-indigo-50/50' : 'opacity-40'} ${isExpanded ? 'bg-indigo-50/70' : ''}`}
                                     >
-                                        <div className="w-5 shrink-0 flex items-center justify-center">
+                                        <div className="w-4 md:w-5 shrink-0 flex items-center justify-center">
                                             {hasData && (
                                                 isExpanded
                                                     ? <ChevronDown className="w-4 h-4 text-indigo-500" />
                                                     : <ChevronRight className="w-4 h-4 text-gray-400" />
                                             )}
                                         </div>
-                                        <div className="w-16 shrink-0 text-sm font-medium text-gray-700 whitespace-nowrap">
+                                        <div className="w-14 md:w-16 shrink-0 text-xs md:text-sm font-medium text-gray-700 whitespace-nowrap">
                                             {monthData.month.substring(0, 3)} '{String(selectedYear).slice(-2)}
                                         </div>
-                                        <div className={`flex-1 text-sm tabular-nums text-right pr-4 ${hasData ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
+                                        <div className={`flex-1 text-xs md:text-sm tabular-nums text-right pr-2 md:pr-4 ${hasData ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
                                             {formatCurrency(monthTotals.royyan)}
                                         </div>
-                                        <div className={`flex-1 text-sm tabular-nums text-right pr-4 ${hasData ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
+                                        <div className={`flex-1 text-xs md:text-sm tabular-nums text-right pr-2 md:pr-4 ${hasData ? 'text-gray-800 font-medium' : 'text-gray-400'}`}>
                                             {formatCurrency(monthTotals.inez)}
                                         </div>
-                                        <div className={`w-28 shrink-0 text-sm tabular-nums font-semibold text-right ${hasData ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                        <div className={`w-24 md:w-28 shrink-0 text-xs md:text-sm tabular-nums font-semibold text-right ${hasData ? 'text-indigo-600' : 'text-gray-400'}`}>
                                             {formatCurrency(monthTotals.total)}
                                         </div>
                                     </div>
@@ -346,34 +346,34 @@ const IncomeManager: React.FC<Props> = ({ incomeData }) => {
                                                 return (
                                                     <div
                                                         key={idx}
-                                                        className="flex px-3 py-2 hover:bg-white/50 transition-colors"
+                                                        className="flex px-2 md:px-3 py-2 hover:bg-white/50 transition-colors"
                                                     >
-                                                        <div className="w-5 shrink-0"></div>
-                                                        <div className="w-16 shrink-0 flex items-start">
-                                                            <span className="text-xs text-gray-400 font-mono">{entry.date}</span>
+                                                        <div className="w-4 md:w-5 shrink-0"></div>
+                                                        <div className="w-14 md:w-16 shrink-0 flex items-start">
+                                                            <span className="text-[10px] md:text-xs text-gray-400 font-mono">{entry.date}</span>
                                                         </div>
-                                                        <div className="flex-1 pr-4">
+                                                        <div className="flex-1 pr-2 md:pr-4">
                                                             {normalized === 'royyan' ? (
                                                                 <div className="flex flex-col items-end">
-                                                                    <span className="text-xs text-blue-600 font-medium tabular-nums">{formatCurrency(entry.amount)}</span>
-                                                                    <span className="text-[10px] text-gray-400 truncate max-w-[120px] text-right" title={entry.source}>{entry.source}</span>
+                                                                    <span className="text-[10px] md:text-xs text-blue-600 font-medium tabular-nums">{formatCurrency(entry.amount)}</span>
+                                                                    <span className="text-[9px] text-gray-400 truncate max-w-[80px] md:max-w-[120px] text-right" title={entry.source}>{entry.source}</span>
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-gray-300 text-xs block text-right">-</span>
+                                                                <span className="text-gray-300 text-[10px] md:text-xs block text-right">-</span>
                                                             )}
                                                         </div>
-                                                        <div className="flex-1 pr-4">
+                                                        <div className="flex-1 pr-2 md:pr-4">
                                                             {normalized === 'inez' ? (
                                                                 <div className="flex flex-col items-end">
-                                                                    <span className="text-xs text-pink-600 font-medium tabular-nums">{formatCurrency(entry.amount)}</span>
-                                                                    <span className="text-[10px] text-gray-400 truncate max-w-[120px] text-right" title={entry.source}>{entry.source}</span>
+                                                                    <span className="text-[10px] md:text-xs text-pink-600 font-medium tabular-nums">{formatCurrency(entry.amount)}</span>
+                                                                    <span className="text-[9px] text-gray-400 truncate max-w-[80px] md:max-w-[120px] text-right" title={entry.source}>{entry.source}</span>
                                                                 </div>
                                                             ) : (
-                                                                <span className="text-gray-300 text-xs block text-right">-</span>
+                                                                <span className="text-gray-300 text-[10px] md:text-xs block text-right">-</span>
                                                             )}
                                                         </div>
-                                                        <div className="w-28 shrink-0 text-right">
-                                                            <span className="text-xs text-gray-400 tabular-nums">{formatCurrency(entry.amount)}</span>
+                                                        <div className="w-24 md:w-28 shrink-0 text-right">
+                                                            <span className="text-[10px] md:text-xs text-gray-400 tabular-nums">{formatCurrency(entry.amount)}</span>
                                                         </div>
                                                     </div>
                                                 );
@@ -386,16 +386,16 @@ const IncomeManager: React.FC<Props> = ({ incomeData }) => {
                     </div>
 
                     {/* Table Footer - Totals */}
-                    <div className="flex px-3 py-3.5 bg-gradient-to-r from-indigo-50 to-violet-50 border-t-2 border-indigo-100">
-                        <div className="w-5 shrink-0"></div>
-                        <div className="w-16 shrink-0 text-sm font-bold text-gray-800">Total</div>
-                        <div className="flex-1 text-sm tabular-nums font-bold text-blue-600 text-right pr-4">
+                    <div className="flex px-2 md:px-3 py-3.5 bg-indigo-50 border-t-2 border-indigo-100 rounded-b-2xl">
+                        <div className="w-4 md:w-5 shrink-0"></div>
+                        <div className="w-14 md:w-16 shrink-0 text-xs md:text-sm font-bold text-gray-800">Total</div>
+                        <div className="flex-1 text-[11px] md:text-sm tabular-nums font-bold text-blue-600 text-right pr-2 md:pr-4">
                             {formatCurrency(totals.royyan)}
                         </div>
-                        <div className="flex-1 text-sm tabular-nums font-bold text-pink-600 text-right pr-4">
+                        <div className="flex-1 text-[11px] md:text-sm tabular-nums font-bold text-pink-600 text-right pr-2 md:pr-4">
                             {formatCurrency(totals.inez)}
                         </div>
-                        <div className="w-28 shrink-0 text-sm tabular-nums font-bold text-indigo-600 text-right">
+                        <div className="w-24 md:w-28 shrink-0 text-[11px] md:text-sm tabular-nums font-bold text-indigo-600 text-right">
                             {formatCurrency(totals.joint)}
                         </div>
                     </div>
