@@ -1,43 +1,32 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import ExpenseLogger from './components/ExpenseLogger';
 import BudgetTable from './components/BudgetTable';
 import ChatAssistant from './components/ChatAssistant';
 import TransactionList from './components/TransactionList';
-import NotificationPage from './components/NotificationPage';
 import Login from './components/Login';
 
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
 import { isTokenExpired, silentRefreshToken } from './services/authService';
-import { requestNotificationPermission, subscribeToPush, showLocalNotification, isNotificationPermissionGranted } from './services/pushNotificationService';
-import { getNotifications, saveNotification, createNotification, getUnreadCount } from './services/notificationStorageService';
-import { Expense, BudgetLineItem, User, Notification } from './types';
-import { DEFAULT_BUDGET_ITEMS, formatCurrency } from './constants';
+import { Expense, BudgetLineItem, User } from './types';
+import { DEFAULT_BUDGET_ITEMS } from './constants';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
 
   // Global App Mode State (Persistent)
   const [appMode, setAppMode] = useState<'standard' | 'yearly'>('standard');
   const [activePlan, setActivePlan] = useState<string>('');
   const [waExpense, setWaExpense] = useState<any>(null);
-
-  // Helper to refresh notifications from storage
-  const refreshNotifications = () => {
-    setNotifications(getNotifications());
-    setUnreadCount(getUnreadCount());
-  };
 
   // 1. Check for existing session and mode on mount
   useEffect(() => {
@@ -68,9 +57,6 @@ export default function App() {
       const savedMode = getAppMode();
       setAppMode(savedMode.mode);
       setActivePlan(savedMode.planName);
-
-      // Load notifications
-      refreshNotifications();
 
       // Check for WhatsApp bridged expense in URL
       const checkWaExpense = () => {
@@ -127,35 +113,6 @@ export default function App() {
       const expensesData = await fetchSheetValues(currentUser, 'Expenses!A:G'); // Extended range for budgetItemName
       const parsedExpenses = parseExpensesFromSheet(expensesData.values);
 
-      // Detect new expenses from external sources (e.g., WhatsApp webhook)
-      // Only check if we already have expenses loaded (not first load)
-      if (expenses.length > 0) {
-        const existingIds = new Set(expenses.map(e => e.id));
-        const newExpenses = parsedExpenses.filter(e => !existingIds.has(e.id));
-
-        // Create notifications for new expenses (likely from WhatsApp)
-        for (const newExpense of newExpenses) {
-          const notif = createNotification(
-            'receipt',
-            'whatsapp',
-            '📱 WhatsApp Receipt',
-            `${formatCurrency(newExpense.amount)} at ${newExpense.description || newExpense.category}`,
-            newExpense.id,
-            newExpense.category
-          );
-          saveNotification(notif);
-
-          // Show local notification if permission granted
-          if (isNotificationPermissionGranted()) {
-            showLocalNotification(notif.title, notif.message);
-          }
-        }
-
-        if (newExpenses.length > 0) {
-          refreshNotifications();
-        }
-      }
-
       setExpenses(parsedExpenses);
 
     } catch (error: any) {
@@ -195,64 +152,6 @@ export default function App() {
         const expensesData = await fetchSheetValues(user, 'Expenses!A:G');
         const parsedExpenses = parseExpensesFromSheet(expensesData.values);
         setExpenses(parsedExpenses);
-
-        // Send and store notification for new expense
-        const receiptNotif = createNotification(
-          'receipt',
-          'app',
-          '💰 Expense Logged',
-          `${formatCurrency(expense.amount)} spent on ${expense.category}${expense.description ? ': ' + expense.description : ''}`,
-          expense.id,
-          expense.category
-        );
-        saveNotification(receiptNotif);
-        refreshNotifications();
-
-        if (isNotificationPermissionGranted()) {
-          await showLocalNotification(receiptNotif.title, receiptNotif.message);
-
-          // Check budget threshold for this category
-          const categoryBudget = budgetItems
-            .filter(item => item.category === expense.category)
-            .reduce((sum, item) => sum + (item.frequency === 'Monthly' ? item.amount : item.amount / 12), 0);
-
-          if (categoryBudget > 0) {
-            // Calculate total spent in this category this month
-            const now = new Date();
-            const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-            const categorySpent = parsedExpenses
-              .filter(e => e.category === expense.category && e.date >= monthStart)
-              .reduce((sum, e) => sum + e.amount, 0);
-
-            const percentUsed = (categorySpent / categoryBudget) * 100;
-
-            if (percentUsed >= 100) {
-              const budgetExceededNotif = createNotification(
-                'budget-exceeded',
-                'app',
-                '🚨 Budget Exceeded!',
-                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget (${formatCurrency(categorySpent)} / ${formatCurrency(categoryBudget)})`,
-                undefined,
-                expense.category
-              );
-              saveNotification(budgetExceededNotif);
-              refreshNotifications();
-              await showLocalNotification(budgetExceededNotif.title, budgetExceededNotif.message);
-            } else if (percentUsed >= 80) {
-              const budgetWarningNotif = createNotification(
-                'budget-warning',
-                'app',
-                '⚠️ Budget Alert',
-                `${expense.category} is at ${percentUsed.toFixed(0)}% of budget (${formatCurrency(categorySpent)} / ${formatCurrency(categoryBudget)})`,
-                undefined,
-                expense.category
-              );
-              saveNotification(budgetWarningNotif);
-              refreshNotifications();
-              await showLocalNotification(budgetWarningNotif.title, budgetWarningNotif.message);
-            }
-          }
-        }
 
       } catch (error: any) {
         console.error("Save Error", error);
@@ -346,16 +245,9 @@ export default function App() {
   }
 
   if (!user) {
-    return <Login onLoginSuccess={async (u) => {
+    return <Login onLoginSuccess={(u) => {
       saveUserSession(u);
       setUser(u);
-
-      // Request notification permission after login
-      const permission = await requestNotificationPermission();
-      if (permission === 'granted') {
-        await subscribeToPush();
-        console.log('Push notifications enabled');
-      }
     }} />;
   }
 
@@ -377,7 +269,6 @@ export default function App() {
       onRefresh={() => loadData(user)}
       user={user}
       onLogout={handleLogout}
-      unreadNotificationCount={unreadCount}
     >
       {activeTab === 'dashboard' && (
         <Dashboard
@@ -420,13 +311,6 @@ export default function App() {
         />
       )}
       {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} />}
-      {activeTab === 'notifications' && (
-        <NotificationPage
-          notifications={notifications}
-          onNotificationsChange={refreshNotifications}
-        />
-      )}
-
     </Layout>
   );
 }

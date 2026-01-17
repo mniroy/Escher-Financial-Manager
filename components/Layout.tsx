@@ -1,18 +1,17 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Download, RefreshCw, LogOut, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Bell, Link2 } from 'lucide-react';
+import { RefreshCw, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'notifications') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
-  unreadNotificationCount?: number;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh, user, onLogout, unreadNotificationCount = 0 }) => {
+const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRefresh, user, onLogout }) => {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
 
   // Pull to refresh state
@@ -189,78 +188,10 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             {activeTab === 'input' && 'Add Expense'}
             {activeTab === 'budget' && 'Budget'}
             {activeTab === 'chat' && 'Assistant'}
-            {activeTab === 'notifications' && 'Notifications'}
-
           </h1>
 
-          {/* Notification Icon */}
-          <button
-            onClick={() => setActiveTab('notifications')}
-            className="p-2 text-gray-700 hover:bg-gray-100 rounded-lg relative"
-          >
-            <Bell className="w-5 h-5" />
-            {unreadNotificationCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center">
-                {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
-              </span>
-            )}
-          </button>
-
-          {/* Copy Webhook URL */}
-          <button
-            onClick={async () => {
-              const userSession = localStorage.getItem('escher_user_session');
-              let refreshToken = '';
-              let spreadsheetId = '';
-              if (userSession) {
-                try {
-                  const parsed = JSON.parse(userSession);
-                  refreshToken = parsed.refreshToken || '';
-                  spreadsheetId = parsed.spreadsheetId || '';
-                } catch (e) { }
-              }
-
-              if (!refreshToken) {
-                alert('Please log in with Google first to generate webhook URL');
-                return;
-              }
-              if (!spreadsheetId) {
-                spreadsheetId = prompt('Enter your Spreadsheet ID:') || '';
-                if (!spreadsheetId) {
-                  alert('Spreadsheet ID is required');
-                  return;
-                }
-              }
-
-              // Get push subscription for notifications
-              let pushSub = null;
-              const savedSub = localStorage.getItem('escher_push_subscription');
-              if (savedSub) {
-                try {
-                  pushSub = JSON.parse(savedSub);
-                } catch (e) { }
-              }
-
-              const config: any = { rt: refreshToken, sid: spreadsheetId };
-              if (pushSub) {
-                config.push = pushSub;
-              }
-
-              const encoded = btoa(JSON.stringify(config));
-              const url = `${window.location.origin}/api/webhook/waha?c=${encoded}`;
-              navigator.clipboard.writeText(url).then(() => {
-                alert(pushSub
-                  ? 'Webhook URL copied! Push notifications are enabled.'
-                  : 'Webhook URL copied! (Enable notifications for push alerts)');
-              }).catch(() => {
-                prompt('Copy this URL:', url);
-              });
-            }}
-            className="p-2 -mr-2 text-gray-700 hover:bg-gray-100 rounded-lg"
-            title="Copy Webhook URL"
-          >
-            <Link2 className="w-5 h-5" />
-          </button>
+          {/* Empty spacer for layout balance */}
+          <div className="w-9" />
         </div>
       </header >
 

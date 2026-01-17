@@ -73,9 +73,7 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                 if (waha.apiUrl) {
                     try {
                         const wUrl = `${waha.apiUrl}/api/${waha.session || 'default'}/messages/${messageId}/download`;
-                        const res = await fetch(wUrl, {
-                            headers: { 'X-Api-Key': waha.apiKey || '' }
-                        });
+                        const res = await fetch(wUrl);
                         if (res.ok) {
                             const buffer = await res.arrayBuffer();
                             const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
