@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid } from 'lucide-react';
+import { RefreshCw, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Wallet } from 'lucide-react';
 import { User as UserType } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
@@ -25,7 +25,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
   const [swipeStartY, setSwipeStartY] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
 
-  const tabs: Array<'dashboard' | 'transactions' | 'chat' | 'budget'> = ['dashboard', 'transactions', 'budget', 'chat'];
+  const tabs: Array<'dashboard' | 'transactions' | 'income' | 'budget'> = ['dashboard', 'transactions', 'budget', 'income'];
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
@@ -188,10 +188,16 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             {activeTab === 'input' && 'Add Expense'}
             {activeTab === 'budget' && 'Budget'}
             {activeTab === 'chat' && 'Assistant'}
+            {activeTab === 'income' && 'Income'}
           </h1>
 
-          {/* Empty spacer for layout balance */}
-          <div className="w-9" />
+          {/* Chat Button - Top Right */}
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`p-2 -mr-2 rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
+          >
+            <MessageSquare className="w-5 h-5" />
+          </button>
         </div>
       </header >
 
@@ -252,12 +258,12 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             <ClipboardList className="w-6 h-6" />
           </button>
 
-          {/* Chat */}
+          {/* Income */}
           <button
-            onClick={() => setActiveTab('chat')}
-            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${activeTab === 'chat' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
+            onClick={() => setActiveTab('income')}
+            className={`flex flex-col items-center p-2 rounded-lg transition-colors ${activeTab === 'income' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
           >
-            <MessageSquare className="w-6 h-6" />
+            <Wallet className="w-6 h-6" />
           </button>
         </div>
       </nav>

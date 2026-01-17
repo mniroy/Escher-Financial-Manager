@@ -4,22 +4,24 @@ import Dashboard from './components/Dashboard';
 import ExpenseLogger from './components/ExpenseLogger';
 import BudgetTable from './components/BudgetTable';
 import ChatAssistant from './components/ChatAssistant';
+import IncomeManager from './components/IncomeManager';
 import TransactionList from './components/TransactionList';
 import Login from './components/Login';
 
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
-import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet } from './services/googleSheetsService';
+import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet, parseIncomeFromSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
 import { isTokenExpired, silentRefreshToken } from './services/authService';
-import { Expense, BudgetLineItem, User } from './types';
+import { Expense, BudgetLineItem, User, IncomeEntry } from './types';
 import { DEFAULT_BUDGET_ITEMS } from './constants';
 import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
+  const [incomeData, setIncomeData] = useState<IncomeEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -112,8 +114,17 @@ export default function App() {
       // Sync Expenses
       const expensesData = await fetchSheetValues(currentUser, 'Expenses!A:G'); // Extended range for budgetItemName
       const parsedExpenses = parseExpensesFromSheet(expensesData.values);
-
       setExpenses(parsedExpenses);
+
+      // Sync Income
+      try {
+        const incomeSheetData = await fetchSheetValues(currentUser, 'Income!A:K');
+        const parsedIncome = parseIncomeFromSheet(incomeSheetData.values);
+        setIncomeData(parsedIncome);
+      } catch (incomeError) {
+        console.warn('Income sheet not found or empty', incomeError);
+        setIncomeData([]);
+      }
 
     } catch (error: any) {
       console.error("Sync Error", error);
@@ -317,7 +328,8 @@ export default function App() {
           expenses={expenses}
         />
       )}
-      {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} />}
+      {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} incomeData={incomeData} />}
+      {activeTab === 'income' && <IncomeManager incomeData={incomeData} />}
     </Layout>
   );
 }

@@ -47,8 +47,8 @@ self.addEventListener('notificationclick', (event) => {
     );
 });
 
-// Basic caching strategy
-const CACHE_NAME = 'escher-static-v1';
+// Updated cache version - increment this to bust old caches
+const CACHE_NAME = 'escher-static-v2';
 const ASSETS = [
     '/',
     '/index.html',
@@ -63,18 +63,44 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-    event.waitUntil(clients.claim());
+    // Delete old caches
+    event.waitUntil(
+        caches.keys().then((cacheNames) => {
+            return Promise.all(
+                cacheNames.map((cacheName) => {
+                    if (cacheName !== CACHE_NAME) {
+                        console.log('Deleting old cache:', cacheName);
+                        return caches.delete(cacheName);
+                    }
+                })
+            );
+        }).then(() => clients.claim())
+    );
 });
 
 self.addEventListener('fetch', (event) => {
-    // Standard network-first approach for index.html (to handle URL params)
-    if (event.request.mode === 'navigate') {
+    const url = new URL(event.request.url);
+
+    // Network-first for navigation and JS/CSS files (always get fresh code)
+    if (event.request.mode === 'navigate' ||
+        url.pathname.endsWith('.js') ||
+        url.pathname.endsWith('.css')) {
         event.respondWith(
-            fetch(event.request).catch(() => caches.match('/'))
+            fetch(event.request)
+                .then((response) => {
+                    // Cache the fresh response
+                    const responseClone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseClone);
+                    });
+                    return response;
+                })
+                .catch(() => caches.match(event.request))
         );
         return;
     }
 
+    // Cache-first for other assets (images, etc.)
     event.respondWith(
         caches.match(event.request).then((response) => {
             return response || fetch(event.request);

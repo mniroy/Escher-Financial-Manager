@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { formatCurrency } from '../constants';
-import { BudgetCategory, BudgetLineItem } from '../types';
+import { BudgetCategory, BudgetLineItem, IncomeEntry } from '../types';
 import { Plus, Pencil, Trash2, X, Save, Check } from 'lucide-react';
 
 interface BudgetTableProps {
   budgetItems: BudgetLineItem[];
   onUpdateBudget: (items: BudgetLineItem[]) => void;
+  incomeData?: IncomeEntry[];
 }
 
-const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }) => {
+const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, incomeData = [] }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -106,6 +107,35 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
   const totalMonthly = monthlyItems.reduce((acc, curr) => acc + curr.amount, 0);
   const totalYearly = yearlyItems.reduce((acc, curr) => acc + curr.amount, 0);
   const grandTotal = (totalMonthly * 12) + totalYearly;
+
+  // Calculate Net Income for 2025 and 2026
+  const incomeSummary = useMemo(() => {
+    let lyNet = 0; // 2025
+    let tyNet = 0; // 2026
+
+    incomeData.forEach(entry => {
+      // Logic to extract year from entry.month or entry.date
+      let entryYear = 0;
+
+      // Try format: "2025-07" or "2025-07-31" in month or date
+      const isoMatch = (entry.month || entry.date)?.match(/^(\d{4})/);
+      if (isoMatch) {
+        entryYear = parseInt(isoMatch[1]);
+      } else if (entry.date) {
+        // Try parsing full date string
+        const d = new Date(entry.date);
+        if (!isNaN(d.getTime())) {
+          entryYear = d.getFullYear();
+        }
+      }
+
+      const amount = Number(entry.takeHomePay || 0);
+      if (entryYear === 2025) lyNet += amount;
+      if (entryYear === 2026) tyNet += amount;
+    });
+
+    return { lyNet, tyNet };
+  }, [incomeData]);
 
   const RenderSection = ({
     title,
@@ -294,9 +324,29 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget }
 
           <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
 
-          <div className="z-10 text-center md:text-left">
+          <div className="z-10 text-center md:text-left flex-1">
             <h3 className="text-indigo-200 text-sm font-medium uppercase tracking-wider mb-1">Total Annual Budget</h3>
             <p className="text-3xl md:text-4xl font-extrabold tracking-tight">{formatCurrency(grandTotal)}</p>
+
+            <div className="mt-4 flex items-center justify-center md:justify-start">
+              <div className="flex bg-white/5 backdrop-blur-md rounded-xl md:rounded-full px-4 py-2 border border-white/10 gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
+                  <div className="flex flex-col leading-none">
+                    <span className="text-[8px] text-indigo-300 font-bold uppercase tracking-wider whitespace-nowrap">LY Net Income</span>
+                    <span className="text-xs font-bold font-mono tracking-tighter">{formatCurrency(incomeSummary.lyNet)}</span>
+                  </div>
+                </div>
+                <div className="w-px h-4 bg-white/10 self-center"></div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div>
+                  <div className="flex flex-col leading-none">
+                    <span className="text-[8px] text-emerald-300 font-bold uppercase tracking-wider whitespace-nowrap">TY YTD Net Income</span>
+                    <span className="text-xs font-bold text-emerald-50 font-mono tracking-tighter">{formatCurrency(incomeSummary.tyNet)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 z-10 w-full md:w-auto">

@@ -243,3 +243,33 @@ export const saveExpensesToSheet = async (user: User, expenses: Expense[]) => {
     }
   }
 };
+
+export const parseIncomeFromSheet = (values: any[][]): import('../types').IncomeEntry[] => {
+  if (!values || values.length <= 1) return [];
+
+  return values.slice(1).map(row => {
+    // Helper to parse currency values
+    const parseAmount = (val: any): number => {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') {
+        const cleaned = val.replace(/[^0-9.-]+/g, '');
+        return parseFloat(cleaned) || 0;
+      }
+      return 0;
+    };
+
+    return {
+      date: row[0] || '',
+      month: row[1] || '',
+      person: row[2] || '',
+      source: row[3] || '',
+      category: row[4] || '',
+      baseIncome: parseAmount(row[5]),
+      allowance: parseAmount(row[6]),
+      totalIncome: parseAmount(row[7]),
+      deduction: parseAmount(row[8]),
+      takeHomePay: parseAmount(row[9]),
+      paymentMethod: row[10] || ''
+    };
+  });
+};

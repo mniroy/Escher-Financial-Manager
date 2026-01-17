@@ -82,3 +82,17 @@ export interface WahaConfig {
   allowedIds: string; // Comma separated IDs
   pushSubscription?: any; // To allow the backend to send push notifications
 }
+
+export interface IncomeEntry {
+  date: string; // ISO Date string
+  month: string; // e.g., "2025-07" or "July 2025"
+  person: string; // e.g., "Royyan Wicaksono" or "Inez"
+  source: string; // e.g., "PT Johnson & Johnson Indonesia"
+  category: string; // e.g., "Salary"
+  baseIncome: number;
+  allowance: number;
+  totalIncome: number;
+  deduction: number;
+  takeHomePay: number;
+  paymentMethod?: string;
+}
