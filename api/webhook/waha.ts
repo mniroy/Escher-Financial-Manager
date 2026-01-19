@@ -137,8 +137,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 👤 ${analysis.person}
 🏢 ${analysis.source}
 📂 ${analysis.category}
-💵 Rp ${analysis.takeHomePay.toLocaleString('id-ID')}
 📅 ${analysis.date}
+
+➕ Gross: Rp ${analysis.totalIncome.toLocaleString('id-ID')}
+➖ Deduct: Rp ${analysis.deduction.toLocaleString('id-ID')}
+💵 *Net: Rp ${analysis.takeHomePay.toLocaleString('id-ID')}*
+
 💳 ${analysis.paymentMethod}
 
 ${logStatus}`;

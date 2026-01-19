@@ -14,6 +14,10 @@ const BUDGET_CATEGORIES = [
     'Home Maintenance', 'Mortgage', 'Shopping', 'Tax', 'Transportation', 'Vacation', 'Other'
 ];
 
+const INCOME_CATEGORIES = [
+    'Salary', 'Bonus', 'Dividend', 'Interest', 'Cashback', 'Gift', 'Side Hustle', 'Refund', 'Other'
+];
+
 function cleanBase64(base64: string): string {
     return base64
         .replace(/^data:image\/[a-z]+;base64,/, '')
@@ -62,17 +66,19 @@ Return JSON: {"amount": number, "merchant": string, "date": "YYYY-MM-DD", "categ
 
 export async function analyzeIncome(text: string, base64Image: string | null, mimeType: string | null, apiKey: string): Promise<IncomeEntry> {
     const currentDate = new Date().toISOString().split('T')[0];
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
     const parts: any[] = [
         {
-            text: `Analyze this income information. Extract date, person, source, category, base income, allowance, deduction, and payment method.
+            text: `Analyze this income information. Extract date, person (recipient), source, category, base income, allowance, deduction, and payment method.
             
 CONTEXT:
 - Today's date is ${currentDate}.
-- Extract the person receiving the income if mentioned (e.g., "Royyan" or "Inez").
-- Source is where the money comes from.
-- Category is the type of income (Salary, Bonus, Side Hustle, etc.).
+- IMPORTANT - PERSON IDENTIFICATION: 
+  - If you see names like "Callista", "Hapsari", "Almira", "Inez", or "Ersya", the person is "Inez".
+  - If you see names like "Royyan", "Nur", or "Wicaksono", the person is "Royyan".
+  - It usually appears in the "Recipient" or "Receiver" field of a bank transfer.
+- Source is the sender or entity paying the money.
+- Category must be one of: ${INCOME_CATEGORIES.join(', ')}.
 - Base Income is the main amount.
 - Allowance and Deduction are optional additional amounts.
 - Total Income = Base + Allowance.
@@ -85,7 +91,7 @@ Message Text: "${text}"
 Return JSON matching this structure:
 {
   "date": "YYYY-MM-DD",
-  "person": "string",
+  "person": "Royyan" | "Inez",
   "source": "string",
   "category": "string",
   "baseIncome": number,
@@ -116,14 +122,14 @@ Return JSON matching this structure:
     const totalIncome = (result.baseIncome || 0) + (result.allowance || 0);
     const takeHomePay = totalIncome - (result.deduction || 0);
     const dateObj = new Date(result.date || currentDate);
-    const monthYear = `${months[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
+    const monthNum = String(dateObj.getMonth() + 1).padStart(2, '0');
 
     return {
         date: result.date || currentDate,
-        month: monthYear,
-        person: result.person || 'Unknown',
+        month: monthNum,
+        person: result.person || 'Royyan',
         source: result.source || 'Unknown',
-        category: result.category || 'Income',
+        category: result.category || 'Other',
         baseIncome: result.baseIncome || 0,
         allowance: result.allowance || 0,
         totalIncome: totalIncome,

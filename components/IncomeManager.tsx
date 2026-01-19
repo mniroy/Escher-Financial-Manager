@@ -27,11 +27,11 @@ const MONTHS = [
 ];
 
 // Helper to normalize person names
-const normalizePerson = (name: string): 'royyan' | 'inez' | 'other' => {
+const normalizePerson = (name: string): 'royyan' | 'inez' => {
     const lower = name.toLowerCase();
-    if (lower.includes('royyan')) return 'royyan';
     if (lower.includes('inez')) return 'inez';
-    return 'other';
+    // Fallback to royyan for existing data or ambiguous entries
+    return 'royyan';
 };
 
 // Helper to parse month from various formats
@@ -69,14 +69,15 @@ const parseMonthYear = (monthStr: string, dateStr?: string): { month: string; ye
         }
     }
 
-    // Try format: "July 2025" or "Jul 2025"
-    if (monthStr) {
+    // Try format: "July 2025" or "Jul 2025" or "January 2026"
+    if (monthStr && typeof monthStr === 'string') {
+        const lowerMonth = monthStr.toLowerCase();
         for (let i = 0; i < MONTHS.length; i++) {
-            if (monthStr.toLowerCase().includes(MONTHS[i].toLowerCase().substring(0, 3))) {
+            const m = MONTHS[i].toLowerCase();
+            if (lowerMonth.includes(m) || lowerMonth.includes(m.substring(0, 3))) {
                 const yearMatch = monthStr.match(/\d{4}/);
-                if (yearMatch) {
-                    return { month: MONTHS[i], year: parseInt(yearMatch[0]) };
-                }
+                const year = yearMatch ? parseInt(yearMatch[0]) : (yearFromDate || new Date().getFullYear());
+                return { month: MONTHS[i], year };
             }
         }
     }
