@@ -35,12 +35,8 @@ const Settings: React.FC = () => {
     const user = JSON.parse(localStorage.getItem('escher_user_session') || '{}');
 
     const configData: any = {
-      w: config.apiUrl,
-      s: config.session,
-      a: config.allowedIds,
-      rt: user.refreshToken, // Pass refresh token for background logging
-      sid: user.spreadsheetId, // Pass sheet ID
-      ps: subscription
+      rt: user.refreshToken,
+      sid: user.spreadsheetId
     };
 
     const encoded = btoa(JSON.stringify(configData));
