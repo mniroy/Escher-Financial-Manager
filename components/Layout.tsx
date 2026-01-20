@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { RefreshCw, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Wallet } from 'lucide-react';
+import { RefreshCw, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Wallet, Settings as SettingsIcon } from 'lucide-react';
 import { User as UserType } from '../types';
 import WahaStatusLight from './WahaStatusLight';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'settings') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
@@ -190,15 +190,22 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             {activeTab === 'budget' && 'Budget'}
             {activeTab === 'chat' && 'Assistant'}
             {activeTab === 'income' && 'Income'}
+            {activeTab === 'settings' && 'Settings'}
           </h1>
 
-          {/* Chat Button - Top Right */}
-          <div className="flex-1 flex justify-end">
+          {/* Chat & Settings Buttons - Top Right */}
+          <div className="flex-1 flex justify-end gap-1">
             <button
               onClick={() => setActiveTab('chat')}
-              className={`p-2 -mr-2 rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
+              className={`p-2 rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
             >
               <MessageSquare className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`p-2 -mr-2 rounded-lg transition-colors ${activeTab === 'settings' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
+            >
+              <SettingsIcon className="w-5 h-5" />
             </button>
           </div>
         </div>

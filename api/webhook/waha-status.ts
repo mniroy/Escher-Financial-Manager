@@ -33,13 +33,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!currentSession) {
             return res.status(200).json({
                 status: 'disconnected',
-                message: `Session "${session}" not found. Available: ${Array.isArray(data) ? data.map(s => s.name).join(', ') : 'unknown'}`
+                message: `Session "${session}" not found.`
             });
         }
 
+        if (currentSession.status !== 'WORKING') {
+            return res.status(200).json({
+                status: currentSession.status,
+                message: `WhatsApp session is ${currentSession.status}`
+            });
+        }
+
+        // Session is WORKING, now check if Webhook is configured
+        try {
+            const webhookRes = await fetch(`${wahaUrl}/api/webhooks`, {
+                headers: { 'X-Api-Key': wahaKey || '' }
+            });
+
+            if (webhookRes.ok) {
+                const webhooks = await webhookRes.json();
+                const host = req.headers.host || '';
+                // Look for a webhook that matches our endpoint
+                const hasOurWebhook = webhooks.some((w: any) =>
+                    w.url.includes('/api/webhook/waha') &&
+                    (w.events.includes('message') || w.events.includes('message.upsert') || w.events.includes('message.any'))
+                );
+
+                if (!hasOurWebhook) {
+                    return res.status(200).json({
+                        status: 'NO_WEBHOOK',
+                        message: 'Session active, but Webhook is not configured in WAHA'
+                    });
+                }
+            }
+        } catch (e) {
+            console.warn('[Status] Could not verify webhooks');
+        }
+
         return res.status(200).json({
-            status: currentSession.status, // e.g., 'WORKING', 'SCAN_QR_CODE', 'STOPPED'
-            message: currentSession.status === 'WORKING' ? 'Healthy' : `Status: ${currentSession.status}`
+            status: 'WORKING',
+            message: 'Healthy: Session active and Webhook detected'
         });
 
     } catch (error: any) {

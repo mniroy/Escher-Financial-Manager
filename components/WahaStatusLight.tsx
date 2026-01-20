@@ -39,6 +39,13 @@ const WahaStatusLight: React.FC = () => {
                     icon: <AlertCircle className="w-3 h-3" />,
                     label: 'QR Code Needed'
                 };
+            case 'NO_WEBHOOK':
+                return {
+                    color: 'text-amber-500',
+                    bg: 'bg-amber-500/10',
+                    icon: <Wifi className="w-3 h-3" />,
+                    label: 'Webhook Missing'
+                };
             case 'loading':
                 return {
                     color: 'text-gray-400',

@@ -7,6 +7,7 @@ import ChatAssistant from './components/ChatAssistant';
 import IncomeManager from './components/IncomeManager';
 import TransactionList from './components/TransactionList';
 import Login from './components/Login';
+import Settings from './components/Settings';
 
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet, parseIncomeFromSheet } from './services/googleSheetsService';
@@ -18,7 +19,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'settings'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [incomeData, setIncomeData] = useState<IncomeEntry[]>([]);
@@ -330,6 +331,7 @@ export default function App() {
       )}
       {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} incomeData={incomeData} />}
       {activeTab === 'income' && <IncomeManager incomeData={incomeData} />}
+      {activeTab === 'settings' && <Settings />}
     </Layout>
   );
 }
