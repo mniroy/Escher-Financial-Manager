@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { RefreshCw, Home, BarChart3, ClipboardList, MessageSquare, Plus, LayoutGrid, Wallet } from 'lucide-react';
 import { User as UserType } from '../types';
+import WahaStatusLight from './WahaStatusLight';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -171,18 +172,18 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     >
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex-shrink-0">
         <div className="flex items-center justify-between max-w-5xl mx-auto">
-          {/* Home Icon */}
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`p-2 -ml-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
-          >
-            <LayoutGrid className="w-5 h-5" />
-          </button>
-
-
+          <div className="flex-1 flex items-center gap-1">
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`p-2 -ml-2 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
+            >
+              <LayoutGrid className="w-5 h-5" />
+            </button>
+            <WahaStatusLight />
+          </div>
 
           {/* Page Title */}
-          <h1 className="text-base font-semibold text-gray-900">
+          <h1 className="text-base font-semibold text-gray-900 whitespace-nowrap px-4">
             {activeTab === 'dashboard' && 'Home'}
             {activeTab === 'transactions' && 'Transactions'}
             {activeTab === 'input' && 'Add Expense'}
@@ -192,12 +193,14 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
           </h1>
 
           {/* Chat Button - Top Right */}
-          <button
-            onClick={() => setActiveTab('chat')}
-            className={`p-2 -mr-2 rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
-          >
-            <MessageSquare className="w-5 h-5" />
-          </button>
+          <div className="flex-1 flex justify-end">
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`p-2 -mr-2 rounded-lg transition-colors ${activeTab === 'chat' ? 'bg-indigo-50 text-indigo-600' : 'text-gray-500 hover:bg-gray-100'}`}
+            >
+              <MessageSquare className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </header >
 
