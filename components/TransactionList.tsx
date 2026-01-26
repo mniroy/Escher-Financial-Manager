@@ -318,7 +318,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
             </div>
 
             {/* BOTTOM: Transaction List & Edit Panel Container */}
-            <div className="flex-1 flex min-h-0 p-4 gap-6 overflow-visible relative">
+            <div className="flex-1 flex min-h-0 p-2 md:p-6 gap-6 overflow-visible relative">
 
                 {/* List Container - Flex Grow/Shrink based on modal state */}
                 <div className={`flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-visible transition-all duration-300 ease-in-out flex-1 min-w-0`}>
@@ -337,83 +337,137 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                 <p className="text-sm">Try adjusting the filter range</p>
                             </div>
                         ) : (
-                            <table className="min-w-full divide-y divide-gray-100">
-                                <thead className="bg-gray-50/80 sticky top-0 z-10 backdrop-blur-sm">
-                                    <tr>
-                                        <th className="px-3 md:px-6 py-3 text-left text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider w-20">Date</th>
-                                        <th className="px-3 md:px-6 py-3 text-left text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">Details</th>
-                                        <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Category</th>
-                                        <th className="px-3 md:px-6 py-3 text-right text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">Amount</th>
-                                        {isEditMode && <th className="px-3 md:px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</th>}
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-50">
+                            <>
+                                {/* MOBILE LIST VIEW: Shows for small screens, hidden on md+ */}
+                                <div className="md:hidden divide-y divide-gray-100">
                                     {sortedExpenses.map((expense) => {
                                         const expDate = new Date(expense.date);
                                         const isEditingThis = editingExpense?.id === expense.id;
                                         return (
-                                            <tr
+                                            <div
                                                 key={expense.id}
                                                 onClick={() => handleEdit(expense)}
-                                                className={`group transition-colors cursor-pointer ${isEditingThis ? 'bg-indigo-50/50' : 'hover:bg-gray-50/80'}`}
+                                                className={`flex items-center p-3 gap-3 transition-colors cursor-pointer ${isEditingThis ? 'bg-indigo-50/50' : 'active:bg-gray-50'}`}
                                             >
-                                                <td className="px-3 md:px-6 py-3 whitespace-nowrap align-top">
-                                                    <div className="flex items-center">
-                                                        <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg flex flex-col items-center justify-center font-medium border transition-colors ${isEditingThis ? 'bg-white border-indigo-200 text-indigo-600' : 'bg-gray-50 border-gray-100 text-gray-500 group-hover:bg-white group-hover:border-indigo-200 group-hover:text-indigo-600'}`}>
-                                                            <span className="text-[9px] md:text-[10px] uppercase leading-none">{expDate.toLocaleString('default', { month: 'short' })}</span>
-                                                            <span className="text-xs md:text-sm font-bold leading-none">{expDate.getDate()}</span>
-                                                        </div>
+                                                {/* Date Block */}
+                                                <div className="w-10 h-10 shrink-0 bg-gray-50 rounded-lg flex flex-col items-center justify-center border border-gray-100 font-medium">
+                                                    <span className="text-[8px] uppercase text-gray-400 leading-none">{expDate.toLocaleString('default', { month: 'short' })}</span>
+                                                    <span className="text-sm font-bold text-gray-700 leading-none mt-0.5">{expDate.getDate()}</span>
+                                                </div>
+
+                                                {/* Content Area */}
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex justify-between items-start gap-2 mb-0.5">
+                                                        <span className="text-xs font-medium text-gray-900 truncate" title={expense.description}>
+                                                            {expense.description}
+                                                        </span>
+                                                        <span className="text-xs font-bold text-gray-900 whitespace-nowrap font-mono">
+                                                            {formatCurrency(expense.amount)}
+                                                        </span>
                                                     </div>
-                                                </td>
-                                                <td className="px-3 md:px-6 py-3 align-top min-w-0">
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="text-[11px] md:text-sm font-medium text-gray-900 truncate" title={expense.description}>{expense.description}</span>
-                                                        <div className="flex flex-wrap gap-1 mt-0.5 sm:hidden">
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                                                {expense.category}
-                                                            </span>
-                                                        </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-medium bg-gray-100 text-gray-500 border border-gray-100">
+                                                            {expense.category}
+                                                        </span>
                                                         {expense.budgetItemName && (
-                                                            <span className="inline-flex items-center gap-1 mt-1 text-xs text-purple-600 font-medium">
-                                                                <Plane className="w-3 h-3" />
+                                                            <div className="flex items-center gap-1 text-[9px] text-purple-600 font-bold truncate">
+                                                                <Plane className="w-2.5 h-2.5 shrink-0" />
                                                                 {expense.budgetItemName}
-                                                            </span>
+                                                            </div>
                                                         )}
                                                     </div>
-                                                </td>
-                                                <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap align-top">
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 group-hover:bg-indigo-50 group-hover:text-indigo-700 group-hover:border-indigo-100 transition-colors">
-                                                        {expense.category}
-                                                    </span>
-                                                </td>
-                                                <td className="px-3 md:px-6 py-3 whitespace-nowrap text-right align-top">
-                                                    <span className="text-[11px] md:text-sm font-medium text-gray-900 font-mono tracking-tight">
-                                                        {formatCurrency(expense.amount)}
-                                                    </span>
-                                                </td>
+                                                </div>
+
+                                                {/* Edit Mode Actions (Optional: only if you want quick delete) */}
                                                 {isEditMode && (
-                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm align-top">
-                                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleEdit(expense); }}
-                                                                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                                                            >
-                                                                <Pencil className="w-4 h-4" />
-                                                            </button>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDelete(expense.id); }}
-                                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                                                            >
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </button>
-                                                        </div>
-                                                    </td>
+                                                    <div className="flex gap-1">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDelete(expense.id); }}
+                                                            className="p-1.5 text-red-300 hover:text-red-500 rounded-lg"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
                                                 )}
-                                            </tr>
+                                            </div>
                                         );
                                     })}
-                                </tbody>
-                            </table>
+                                </div>
+
+                                {/* DESKTOP TABLE VIEW: Shows for md+ screens, hidden on small */}
+                                <table className="hidden md:table min-w-full divide-y divide-gray-100 table-auto">
+                                    <thead className="bg-gray-50/80 sticky top-0 z-10 backdrop-blur-sm">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-24">Date</th>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Details</th>
+                                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Category</th>
+                                            <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Amount</th>
+                                            {isEditMode && <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</th>}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-50">
+                                        {sortedExpenses.map((expense) => {
+                                            const expDate = new Date(expense.date);
+                                            const isEditingThis = editingExpense?.id === expense.id;
+                                            return (
+                                                <tr
+                                                    key={expense.id}
+                                                    onClick={() => handleEdit(expense)}
+                                                    className={`group transition-colors cursor-pointer ${isEditingThis ? 'bg-indigo-50/50' : 'hover:bg-gray-50/80'}`}
+                                                >
+                                                    <td className="px-6 py-4 whitespace-nowrap align-top">
+                                                        <div className="flex items-center">
+                                                            <div className={`w-9 h-9 rounded-lg flex flex-col items-center justify-center font-medium border transition-colors ${isEditingThis ? 'bg-white border-indigo-200 text-indigo-600' : 'bg-gray-50 border-gray-100 text-gray-500 group-hover:bg-white group-hover:border-indigo-200 group-hover:text-indigo-600'}`}>
+                                                                <span className="text-[10px] uppercase leading-none">{expDate.toLocaleString('default', { month: 'short' })}</span>
+                                                                <span className="text-sm font-bold leading-none">{expDate.getDate()}</span>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 align-top">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-semibold text-gray-900">{expense.description}</span>
+                                                            {expense.budgetItemName && (
+                                                                <span className="inline-flex items-center gap-1 mt-1 text-xs text-purple-600 font-medium">
+                                                                    <Plane className="w-3 h-3" />
+                                                                    {expense.budgetItemName}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap align-top">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 group-hover:bg-indigo-50 group-hover:text-indigo-700 group-hover:border-indigo-100 transition-colors">
+                                                            {expense.category}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right align-top">
+                                                        <span className="text-sm font-bold text-gray-900 font-mono tracking-tight">
+                                                            {formatCurrency(expense.amount)}
+                                                        </span>
+                                                    </td>
+                                                    {isEditMode && (
+                                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm align-top">
+                                                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleEdit(expense); }}
+                                                                    className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                                                                >
+                                                                    <Pencil className="w-4 h-4" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={(e) => { e.stopPropagation(); handleDelete(expense.id); }}
+                                                                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                                >
+                                                                    <Trash2 className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )}
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </>
                         )}
                     </div>
                 </div>
