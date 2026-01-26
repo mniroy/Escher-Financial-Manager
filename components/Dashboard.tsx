@@ -38,6 +38,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedAnnualPlan, setSelectedAnnualPlan] = useState<string | null>(null);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const yearlyItems = useMemo(() => {
     return budgetItems.filter(item => item.frequency === 'Yearly');
@@ -497,7 +498,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                     const hoverBorder = isOverBudget ? 'hover:border-red-200' : 'hover:border-indigo-200';
 
                     return (
-                      <div key={index} className={`p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-md transition-all duration-200 ${hoverBorder} group`}>
+                      <div
+                        key={index}
+                        onClick={() => setExpandedCategory(expandedCategory === item.category ? null : item.category)}
+                        className={`p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-md transition-all duration-200 ${hoverBorder} group cursor-pointer`}
+                      >
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <p className="font-bold text-gray-900 text-sm truncate max-w-[120px]" title={item.category}>{item.category}</p>
@@ -506,8 +511,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <span className="text-xs text-gray-400 font-medium">/ {formatCurrency(item.budget)}</span>
                             </div>
                           </div>
-                          <div className={`px-2 py-1 rounded text-xs font-bold ${isOverBudget ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
-                            {displayPercentage.toFixed(0)}%
+                          <div className="flex flex-col items-end gap-1">
+                            <div className={`px-2 py-1 rounded text-xs font-bold ${isOverBudget ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600 group-hover:bg-indigo-50 group-hover:text-indigo-600'}`}>
+                              {displayPercentage.toFixed(0)}%
+                            </div>
+                            <ChevronDown className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-300 ${expandedCategory === item.category ? 'rotate-180 text-indigo-500' : ''}`} />
                           </div>
                         </div>
 
@@ -523,6 +531,35 @@ const Dashboard: React.FC<DashboardProps> = ({
                             />
                           )}
                         </div>
+
+                        {/* Expanded Transactions List */}
+                        {expandedCategory === item.category && (
+                          <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                              <Receipt className="w-3 h-3" />
+                              Transactions
+                            </h4>
+                            <div className="space-y-2">
+                              {filteredExpenses
+                                .filter(e => viewMode === 'yearly-only' ? e.budgetItemName === item.category : e.category === item.category)
+                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                .map((expense, eIdx) => (
+                                  <div key={expense.id || eIdx} className="flex justify-between items-center bg-white/50 p-2 rounded-lg border border-gray-50">
+                                    <div className="min-w-0">
+                                      <p className="text-xs font-bold text-gray-800 truncate">{expense.description || expense.category}</p>
+                                      <p className="text-[10px] text-gray-400">{new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                                    </div>
+                                    <span className="text-xs font-bold text-gray-900 ml-2 whitespace-nowrap">
+                                      {formatCurrency(expense.amount)}
+                                    </span>
+                                  </div>
+                                ))}
+                              {filteredExpenses.filter(e => viewMode === 'yearly-only' ? e.budgetItemName === item.category : e.category === item.category).length === 0 && (
+                                <p className="text-[10px] text-gray-400 italic text-center py-2">No transactions found</p>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })

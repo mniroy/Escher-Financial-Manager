@@ -470,15 +470,26 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                                             {/* Month Row */}
                                             <div
                                                 onClick={() => hasData && toggleMonth(monthData.month)}
-                                                className={`flex px-3 py-3 transition-colors ${hasData ? 'cursor-pointer hover:bg-gray-50' : 'opacity-40'} ${isExpanded ? 'bg-indigo-50/50' : ''}`}
+                                                className={`flex px-4 py-4 items-center justify-between transition-colors ${hasData ? 'cursor-pointer hover:bg-gray-50' : 'opacity-40'} ${isExpanded ? 'bg-indigo-50/50' : ''}`}
                                             >
-                                                <div className="w-5 shrink-0 flex items-center justify-center">
-                                                    {hasData && (isExpanded ? <ChevronDown className="w-4 h-4 text-indigo-500" /> : <ChevronRight className="w-4 h-4 text-gray-400" />)}
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="w-5 shrink-0 flex items-center justify-center">
+                                                        {hasData && (isExpanded ? <ChevronDown className="w-4 h-4 text-indigo-500" /> : <ChevronRight className="w-4 h-4 text-gray-400" />)}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-sm font-bold text-gray-900">{monthData.month}</span>
+                                                        <div className="flex gap-2 text-[10px] font-medium text-gray-400">
+                                                            <span className="truncate">R: {formatCurrency(monthTotals.royyan)}</span>
+                                                            <span className="truncate">I: {formatCurrency(monthTotals.inez)}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="w-12 shrink-0 text-xs font-bold text-gray-700">{monthData.month.substring(0, 3)}</div>
-                                                <div className="flex-1 text-xs text-right px-1 font-medium">{formatCurrency(monthTotals.royyan)}</div>
-                                                <div className="flex-1 text-xs text-right px-1 font-medium">{formatCurrency(monthTotals.inez)}</div>
-                                                <div className={`w-20 shrink-0 text-xs font-bold text-right ${hasData ? 'text-indigo-600' : 'text-gray-400'}`}>{formatCurrency(monthTotals.total)}</div>
+                                                <div className="text-right shrink-0 pl-2">
+                                                    <div className={`text-sm font-bold font-mono ${hasData ? 'text-indigo-600' : 'text-gray-400'}`}>
+                                                        {formatCurrency(monthTotals.total)}
+                                                    </div>
+                                                    <div className="text-[10px] uppercase tracking-wider text-gray-400 font-bold opacity-60">Total</div>
+                                                </div>
                                             </div>
 
                                             {/* Detailed breakdown for Mobile */}

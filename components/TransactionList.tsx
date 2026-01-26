@@ -340,11 +340,11 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             <table className="min-w-full divide-y divide-gray-100">
                                 <thead className="bg-gray-50/80 sticky top-0 z-10 backdrop-blur-sm">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-24">Date</th>
-                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Details</th>
+                                        <th className="px-3 md:px-6 py-3 text-left text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider w-20">Date</th>
+                                        <th className="px-3 md:px-6 py-3 text-left text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">Details</th>
                                         <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Category</th>
-                                        <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Amount</th>
-                                        {isEditMode && <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</th>}
+                                        <th className="px-3 md:px-6 py-3 text-right text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wider">Amount</th>
+                                        {isEditMode && <th className="px-3 md:px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</th>}
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-50">
@@ -357,18 +357,18 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                                 onClick={() => handleEdit(expense)}
                                                 className={`group transition-colors cursor-pointer ${isEditingThis ? 'bg-indigo-50/50' : 'hover:bg-gray-50/80'}`}
                                             >
-                                                <td className="px-6 py-4 whitespace-nowrap align-top">
+                                                <td className="px-3 md:px-6 py-3 whitespace-nowrap align-top">
                                                     <div className="flex items-center">
-                                                        <div className={`w-9 h-9 rounded-lg flex flex-col items-center justify-center font-medium border transition-colors ${isEditingThis ? 'bg-white border-indigo-200 text-indigo-600' : 'bg-gray-50 border-gray-100 text-gray-500 group-hover:bg-white group-hover:border-indigo-200 group-hover:text-indigo-600'}`}>
-                                                            <span className="text-[10px] uppercase leading-none">{expDate.toLocaleString('default', { month: 'short' })}</span>
-                                                            <span className="text-sm font-bold leading-none">{expDate.getDate()}</span>
+                                                        <div className={`w-8 h-8 md:w-9 md:h-9 rounded-lg flex flex-col items-center justify-center font-medium border transition-colors ${isEditingThis ? 'bg-white border-indigo-200 text-indigo-600' : 'bg-gray-50 border-gray-100 text-gray-500 group-hover:bg-white group-hover:border-indigo-200 group-hover:text-indigo-600'}`}>
+                                                            <span className="text-[9px] md:text-[10px] uppercase leading-none">{expDate.toLocaleString('default', { month: 'short' })}</span>
+                                                            <span className="text-xs md:text-sm font-bold leading-none">{expDate.getDate()}</span>
                                                         </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4 align-top">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-sm font-semibold text-gray-900 line-clamp-2">{expense.description}</span>
-                                                        <div className="flex flex-wrap gap-1 mt-1 sm:hidden">
+                                                <td className="px-3 md:px-6 py-3 align-top min-w-0">
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-[11px] md:text-sm font-medium text-gray-900 truncate" title={expense.description}>{expense.description}</span>
+                                                        <div className="flex flex-wrap gap-1 mt-0.5 sm:hidden">
                                                             <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
                                                                 {expense.category}
                                                             </span>
@@ -386,8 +386,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                                         {expense.category}
                                                     </span>
                                                 </td>
-                                                <td className="px-6 py-4 whitespace-nowrap text-right align-top">
-                                                    <span className="text-sm font-bold text-gray-900 font-mono tracking-tight">
+                                                <td className="px-3 md:px-6 py-3 whitespace-nowrap text-right align-top">
+                                                    <span className="text-[11px] md:text-sm font-medium text-gray-900 font-mono tracking-tight">
                                                         {formatCurrency(expense.amount)}
                                                     </span>
                                                 </td>
