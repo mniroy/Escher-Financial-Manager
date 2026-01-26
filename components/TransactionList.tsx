@@ -170,6 +170,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
     const handleSaveEdit = async () => {
         if (!editingExpense) return;
+        setIsRefreshing(true); // Using existing refreshing state for a simpler loading UI or add a new one
         try {
             await onEditExpense(editingExpense);
             setIsModalOpen(false);
@@ -177,6 +178,8 @@ const TransactionList: React.FC<TransactionListProps> = ({
         } catch (error) {
             console.error('Failed to update expense:', error);
             alert('Failed to update expense. Please try again.');
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
@@ -268,10 +271,21 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                 <div className="w-px h-4 bg-gray-300 mx-1"></div>
                                 <button
                                     onClick={() => setIsEditMode(!isEditMode)}
-                                    className={`p-1 rounded-md transition-all ${isEditMode ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
-                                    title={isEditMode ? "Done Editing" : "Manage"}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${isEditMode
+                                        ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
+                                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                                 >
-                                    {isEditMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+                                    {isEditMode ? (
+                                        <>
+                                            <Check className="w-3.5 h-3.5" />
+                                            <span>Save</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Pencil className="w-3.5 h-3.5" />
+                                            <span>Manage</span>
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -472,135 +486,162 @@ const TransactionList: React.FC<TransactionListProps> = ({
                     </div>
                 </div>
 
-                {/* Edit Panel (Side) - Integrated */}
+                {/* Edit Panel (Side/Bottom) - Compact & Integrated */}
                 {isModalOpen && editingExpense && (
-                    <div className={`w-full md:w-2/5 lg:w-1/3 bg-white rounded-2xl shadow-xl border border-gray-200 flex flex-col animate-in slide-in-from-right-8 duration-300 absolute md:relative right-0 top-4 bottom-4 md:top-0 md:bottom-0 md:h-full z-20`}>
-                        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
-                            <h3 className="font-bold text-gray-800 text-lg">Edit Transaction</h3>
-                            <button onClick={() => { setIsModalOpen(false); setEditingExpense(null); }} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        <div className="p-6 overflow-visible flex-1 space-y-5">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Date</label>
-                                <input
-                                    type="date"
-                                    value={editingExpense.date}
-                                    onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
-                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 text-sm font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Category</label>
-                                <select
-                                    value={editingExpense.category}
-                                    onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value as BudgetCategory })}
-                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 bg-white text-sm font-medium"
-                                >
-                                    {Object.values(BudgetCategory).map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Description</label>
-                                <textarea
-                                    value={editingExpense.description}
-                                    onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
-                                    rows={3}
-                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 text-sm font-medium resize-none"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Amount</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-gray-400 font-bold text-sm">Rp</span>
-                                    <input
-                                        type="number"
-                                        value={editingExpense.amount}
-                                        onChange={(e) => setEditingExpense({ ...editingExpense, amount: Number(e.target.value) })}
-                                        className="pl-9 w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 text-sm font-bold text-gray-900"
-                                    />
+                    <React.Fragment>
+                        {/* Backdrop for Mobile */}
+                        <div
+                            className="fixed inset-0 bg-black/40 z-[55] md:hidden animate-in fade-in duration-300"
+                            onClick={() => { setIsModalOpen(false); setEditingExpense(null); }}
+                        />
+                        <div className={`w-[95%] max-w-lg md:w-2/5 lg:w-1/3 bg-white rounded-3xl md:rounded-2xl shadow-2xl border border-gray-200 flex flex-col animate-in slide-in-from-bottom-8 md:slide-in-from-right-8 duration-300 fixed md:relative left-1/2 -translate-x-1/2 md:left-auto md:translate-x-0 bottom-4 md:bottom-auto top-auto md:top-0 max-h-[90vh] md:h-full z-[60]`}>
+                            {/* Drag Indicator for Mobile Drawer feel */}
+                            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mt-3 mb-1 md:hidden shrink-0" />
+                            <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
+                                <div className="flex items-center gap-2">
+                                    <h3 className="font-bold text-gray-800 text-lg">Edit Transaction</h3>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={handleSaveEdit}
+                                        disabled={isRefreshing}
+                                        className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        Save
+                                    </button>
+                                    <button onClick={() => { setIsModalOpen(false); setEditingExpense(null); }} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                                        <X className="w-5 h-5" />
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Annual Spend Option */}
-                            <div className="pt-4 mt-2 border-t border-gray-100">
-                                <label className="flex items-center gap-3 cursor-pointer mb-3 group">
-                                    <div className="relative flex items-center">
+                            <div className="p-4 overflow-y-auto custom-scrollbar space-y-4">
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date</label>
                                         <input
-                                            type="checkbox"
-                                            checked={!!editingExpense.budgetItemName}
-                                            onChange={(e) => {
-                                                if (e.target.checked) {
-                                                    const firstYearly = budgetItems.find(i => i.frequency === 'Yearly');
-                                                    if (firstYearly) {
+                                            type="date"
+                                            value={editingExpense.date}
+                                            onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
+                                            className="w-full rounded-xl border-gray-200 bg-gray-50/50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-xs font-semibold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Amount</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-2 text-gray-400 font-bold text-[10px]">Rp</span>
+                                            <input
+                                                type="number"
+                                                value={editingExpense.amount}
+                                                onChange={(e) => setEditingExpense({ ...editingExpense, amount: Number(e.target.value) })}
+                                                className="pl-8 w-full rounded-xl border-gray-200 bg-gray-50/50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-xs font-bold text-gray-900"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Category</label>
+                                    <select
+                                        value={editingExpense.category}
+                                        onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value as BudgetCategory })}
+                                        className="w-full rounded-xl border-gray-200 bg-gray-50/50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 bg-white text-xs font-semibold"
+                                    >
+                                        {Object.values(BudgetCategory).map(cat => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</label>
+                                    <textarea
+                                        value={editingExpense.description}
+                                        onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
+                                        rows={2}
+                                        className="w-full rounded-xl border-gray-200 bg-gray-50/50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 text-xs font-medium resize-none"
+                                        placeholder="What was this for?"
+                                    />
+                                </div>
+
+                                {/* Compact Annual Spend Option */}
+                                <div className="pt-3 border-t border-gray-100">
+                                    <label className="flex items-center justify-between cursor-pointer group">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-1.5 bg-purple-50 rounded-lg text-purple-600">
+                                                <Plane className="w-3.5 h-3.5" />
+                                            </div>
+                                            <span className="text-xs font-bold text-gray-700">Link to Event Plan</span>
+                                        </div>
+                                        <div className="relative flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={!!editingExpense.budgetItemName}
+                                                onChange={(e) => {
+                                                    if (e.target.checked) {
+                                                        const firstYearly = budgetItems.find(i => i.frequency === 'Yearly');
+                                                        if (firstYearly) {
+                                                            setEditingExpense({
+                                                                ...editingExpense,
+                                                                budgetItemName: firstYearly.name,
+                                                                category: firstYearly.category
+                                                            });
+                                                        } else {
+                                                            alert("No yearly plans found in your budget. Please add one first.");
+                                                        }
+                                                    } else {
+                                                        setEditingExpense({ ...editingExpense, budgetItemName: undefined });
+                                                    }
+                                                }}
+                                                className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-gray-300 transition-all checked:border-purple-500 checked:bg-purple-500"
+                                            />
+                                            <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100">
+                                                <Check className="w-3.5 h-3.5" />
+                                            </div>
+                                        </div>
+                                    </label>
+
+                                    {editingExpense.budgetItemName && (
+                                        <div className="animate-in fade-in slide-in-from-top-2">
+                                            <select
+                                                value={editingExpense.budgetItemName}
+                                                onChange={(e) => {
+                                                    const item = budgetItems.find(i => i.name === e.target.value);
+                                                    if (item) {
                                                         setEditingExpense({
                                                             ...editingExpense,
-                                                            budgetItemName: firstYearly.name,
-                                                            category: firstYearly.category
+                                                            budgetItemName: item.name,
+                                                            category: item.category
                                                         });
-                                                    } else {
-                                                        alert("No yearly plans found in your budget. Please add one first.");
                                                     }
-                                                } else {
-                                                    setEditingExpense({ ...editingExpense, budgetItemName: undefined });
-                                                }
-                                            }}
-                                            className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-gray-300 transition-all checked:border-purple-500 checked:bg-purple-500"
-                                        />
-                                        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100">
-                                            <Check className="w-3.5 h-3.5" />
+                                                }}
+                                                className="w-full rounded-xl border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2.5 border px-3 bg-purple-50/30 text-purple-900 text-sm font-semibold"
+                                            >
+                                                {budgetItems.filter(i => i.frequency === 'Yearly').map(item => (
+                                                    <option key={item.name} value={item.name}>{item.name}</option>
+                                                ))}
+                                            </select>
                                         </div>
-                                    </div>
-                                    <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                                        <div className="p-1 bg-purple-100 rounded text-purple-600">
-                                            <Plane className="w-3.5 h-3.5" />
-                                        </div>
-                                        <span>Link to Event / Plan</span>
-                                    </div>
-                                </label>
+                                    )}
+                                </div>
 
-                                {editingExpense.budgetItemName && (
-                                    <div className="animate-in fade-in slide-in-from-top-2">
-                                        <select
-                                            value={editingExpense.budgetItemName}
-                                            onChange={(e) => {
-                                                const item = budgetItems.find(i => i.name === e.target.value);
-                                                if (item) {
-                                                    setEditingExpense({
-                                                        ...editingExpense,
-                                                        budgetItemName: item.name,
-                                                        category: item.category
-                                                    });
-                                                }
-                                            }}
-                                            className="w-full rounded-xl border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2.5 border px-3 bg-purple-50/30 text-purple-900 text-sm font-semibold"
-                                        >
-                                            {budgetItems.filter(i => i.frequency === 'Yearly').map(item => (
-                                                <option key={item.name} value={item.name}>{item.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                )}
+                                <div className="pt-2">
+                                    <button
+                                        onClick={handleSaveEdit}
+                                        disabled={isRefreshing}
+                                        className="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg transition-all active:scale-[0.98] disabled:bg-gray-400"
+                                    >
+                                        {isRefreshing ? (
+                                            <RefreshCw className="w-4 h-4 animate-spin" />
+                                        ) : (
+                                            <Save className="w-4 h-4" />
+                                        )}
+                                        {isRefreshing ? 'Saving...' : 'Save Changes'}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-
-                        <div className="p-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
-                            <button
-                                onClick={handleSaveEdit}
-                                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
-                            >
-                                <Save className="w-4 h-4" />
-                                Save Changes
-                            </button>
-                        </div>
-                    </div>
+                    </React.Fragment>
                 )}
             </div>
         </div>
