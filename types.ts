@@ -50,6 +50,19 @@ export interface AnalysisResult {
   date: string;
 }
 
+export interface IncomeAnalysisResult {
+  date?: string;
+  person?: string;
+  source: string;
+  category: string;
+  baseIncome: number;
+  allowance: number;
+  totalIncome: number;
+  deduction: number;
+  takeHomePay: number;
+  paymentMethod?: string;
+}
+
 export interface GoogleSheetsConfig {
   spreadsheetId: string;
 }

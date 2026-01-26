@@ -21,7 +21,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
 }) => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [selectedDate] = useState(new Date());
-    const [sortBy, setSortBy] = useState<'date' | 'category'>('date');
+    const [sortBy, setSortBy] = useState<'date' | 'category' | 'submission'>('submission');
     const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditMode, setIsEditMode] = useState(false);
@@ -81,6 +81,9 @@ const TransactionList: React.FC<TransactionListProps> = ({
 
     // Sort expenses
     const sortedExpenses = useMemo(() => {
+        if (sortBy === 'submission') {
+            return [...filteredExpenses].reverse();
+        }
         return [...filteredExpenses].sort((a, b) => {
             if (sortBy === 'category') {
                 return a.category.localeCompare(b.category);
@@ -235,6 +238,15 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             </div>
                             <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-100 self-start md:self-end">
                                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Sort</span>
+                                <button
+                                    onClick={() => setSortBy('submission')}
+                                    className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${sortBy === 'submission'
+                                        ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    Submission
+                                </button>
                                 <button
                                     onClick={() => setSortBy('date')}
                                     className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${sortBy === 'date'

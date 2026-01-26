@@ -8,6 +8,7 @@ import IncomeManager from './components/IncomeManager';
 import TransactionList from './components/TransactionList';
 import Login from './components/Login';
 import Settings from './components/Settings';
+import IncomeLogger from './components/IncomeLogger';
 
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
 import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet, parseIncomeFromSheet, saveIncomeToSheet } from './services/googleSheetsService';
@@ -19,7 +20,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'income-input' | 'settings'>('dashboard');
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [incomeData, setIncomeData] = useState<IncomeEntry[]>([]);
@@ -119,7 +120,7 @@ export default function App() {
 
       // Sync Income
       try {
-        const incomeSheetData = await fetchSheetValues(currentUser, 'Income!A:K');
+        const incomeSheetData = await fetchSheetValues(currentUser, 'Income!A:L');
         const parsedIncome = parseIncomeFromSheet(incomeSheetData.values);
         setIncomeData(parsedIncome);
       } catch (incomeError) {
@@ -288,6 +289,38 @@ export default function App() {
     }
   };
 
+  const handleIncomeSave = async (income: IncomeEntry) => {
+    if (user) {
+      try {
+        const row = [
+          income.date,
+          income.month,
+          income.person,
+          income.source,
+          income.category,
+          income.baseIncome,
+          income.allowance,
+          income.totalIncome,
+          income.deduction,
+          income.takeHomePay,
+          income.paymentMethod || '',
+          income.id || crypto.randomUUID()
+        ];
+        await appendSheetRow(user, 'Income!A:L', row);
+        // Reload income data
+        const incomeSheetData = await fetchSheetValues(user, 'Income!A:L');
+        const parsedIncome = parseIncomeFromSheet(incomeSheetData.values);
+        setIncomeData(parsedIncome);
+      } catch (error: any) {
+        console.error("Income Save Error", error);
+        if (error.message === 'TOKEN_EXPIRED') {
+          alert("Session expired. Please log in again.");
+          handleLogout();
+        }
+      }
+    }
+  };
+
   // Memoized refresh handler for TransactionList
   const handleRefresh = useCallback(async () => {
     if (user) {
@@ -373,6 +406,11 @@ export default function App() {
       )}
       {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} incomeData={incomeData} />}
       {activeTab === 'income' && <IncomeManager incomeData={incomeData} onEditIncome={handleEditIncome} onDeleteIncome={handleDeleteIncome} />}
+      {activeTab === 'income-input' && (
+        <div className="flex-1 p-4 md:p-8 overflow-y-auto">
+          <IncomeLogger onSave={handleIncomeSave} />
+        </div>
+      )}
       {activeTab === 'settings' && <Settings />}
     </Layout>
   );

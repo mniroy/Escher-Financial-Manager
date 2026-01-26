@@ -5,8 +5,8 @@ import WahaStatusLight from './WahaStatusLight';
 
 interface LayoutProps {
   children: React.ReactNode;
-  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'settings';
-  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'settings') => void;
+  activeTab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'income-input' | 'settings';
+  setActiveTab: (tab: 'dashboard' | 'transactions' | 'chat' | 'budget' | 'input' | 'income' | 'income-input' | 'settings') => void;
   onRefresh?: () => Promise<void>;
   user: UserType;
   onLogout: () => void;
@@ -224,6 +224,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
           <p className="px-4 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 mt-6">Actions</p>
           <NavItem id="input" icon={Plus} label="Add Expense" />
+          <NavItem id="income-input" icon={Plus} label="Add Income" />
           <NavItem id="chat" icon={MessageSquare} label="AI Assistant" />
           <NavItem id="settings" icon={SettingsIcon} label="Settings" />
         </div>
@@ -260,6 +261,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
             {activeTab === 'budget' && 'Budget'}
             {activeTab === 'chat' && 'Assistant'}
             {activeTab === 'income' && 'Income'}
+            {activeTab === 'income-input' && 'Add Income'}
             {activeTab === 'settings' && 'Settings'}
           </h1>
 
@@ -298,7 +300,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
         {/* Desktop Top Bar (Optional, for context or refresh) */}
         <div className="hidden md:flex items-center justify-between px-8 py-4 bg-white/50 backdrop-blur-sm sticky top-0 z-10 border-b border-gray-200/50">
           <h2 className="text-xl font-bold text-gray-800 capitalize">
-            {activeTab === 'input' ? 'Add Transaction' : activeTab}
+            {activeTab === 'input' ? 'Add Expense' : activeTab === 'income-input' ? 'Add Income' : activeTab}
           </h2>
           <div className="flex items-center gap-3">
             {onRefresh && (

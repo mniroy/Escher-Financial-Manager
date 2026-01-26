@@ -500,7 +500,7 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                                                                 <span className="text-[10px] mobile-sub-text font-medium text-gray-400">{entry.date} • {normalizePerson(entry.person)}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className={`text-xs font-bold font-mono ${normalizePerson(entry.person) === 'royyan' ? 'text-blue-600' : 'text-pink-600'}`}>
+                                                                <span className={`text-xs font-bold font-mono ${normalizePerson(entry.person) === 'royyan' ? 'text-blue-600' : 'text-emerald-600'}`}>
                                                                     {formatCurrency(entry.amount)}
                                                                 </span>
                                                                 <ChevronRight className="w-4 h-4 text-gray-300" />
@@ -524,7 +524,7 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                                             <th className="px-6 py-4 text-left font-bold text-gray-500 uppercase tracking-wider text-xs w-32">Month</th>
                                             <th className="px-6 py-4 text-left font-bold text-gray-500 uppercase tracking-wider text-xs">Breakdown</th>
                                             <th className="px-6 py-4 text-right font-bold text-blue-600 uppercase tracking-wider text-xs w-32">Royyan</th>
-                                            <th className="px-6 py-4 text-right font-bold text-pink-600 uppercase tracking-wider text-xs w-32">Inez</th>
+                                            <th className="px-6 py-4 text-right font-bold text-emerald-600 uppercase tracking-wider text-xs w-32">Inez</th>
                                             <th className="px-6 py-4 text-right font-bold text-indigo-600 uppercase tracking-wider text-xs w-40">Total</th>
                                         </tr>
                                     </thead>
@@ -547,7 +547,7 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                                                         <td className="px-6 py-3 whitespace-nowrap text-right font-mono font-bold text-blue-700 text-sm">
                                                             {formatCurrency(monthTotals.royyan)}
                                                         </td>
-                                                        <td className="px-6 py-3 whitespace-nowrap text-right font-mono font-bold text-pink-700 text-sm">
+                                                        <td className="px-6 py-3 whitespace-nowrap text-right font-mono font-bold text-emerald-700 text-sm">
                                                             {formatCurrency(monthTotals.inez)}
                                                         </td>
                                                         <td className="px-6 py-3 whitespace-nowrap text-right font-mono font-bold text-indigo-700 bg-indigo-50/30 text-sm">
@@ -572,8 +572,8 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                                                                 {/* Source & Actions */}
                                                                 <td className="px-6 py-2 border-b border-gray-50">
                                                                     <div className="flex items-center gap-3">
-                                                                        <div className={`p-1 rounded-full ${isRoyyan ? 'bg-blue-100/50' : 'bg-pink-100/50'}`}>
-                                                                            <div className={`w-1.5 h-1.5 rounded-full ${isRoyyan ? 'bg-blue-500' : 'bg-pink-500'}`}></div>
+                                                                        <div className={`p-1 rounded-full ${isRoyyan ? 'bg-blue-100/50' : 'bg-emerald-100/50'}`}>
+                                                                            <div className={`w-1.5 h-1.5 rounded-full ${isRoyyan ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
                                                                         </div>
                                                                         <span className="text-gray-600 font-medium text-xs truncate max-w-[200px]" title={entry.source}>
                                                                             {entry.source}
@@ -594,7 +594,7 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                                                                 {/* Inez Column */}
                                                                 <td className="px-6 py-2 whitespace-nowrap text-right border-b border-gray-50">
                                                                     {isInez && (
-                                                                        <span className="font-mono text-xs font-medium text-pink-600">
+                                                                        <span className="font-mono text-xs font-medium text-emerald-600">
                                                                             {formatCurrency(entry.amount)}
                                                                         </span>
                                                                     )}
@@ -620,7 +620,7 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                                             <td className="px-6 py-4 text-right text-blue-700 font-mono text-base">
                                                 {formatCurrency(processedData.reduce((acc, m) => acc + getMonthTotals(m.entries).royyan, 0))}
                                             </td>
-                                            <td className="px-6 py-4 text-right text-pink-700 font-mono text-base">
+                                            <td className="px-6 py-4 text-right text-emerald-700 font-mono text-base">
                                                 {formatCurrency(processedData.reduce((acc, m) => acc + getMonthTotals(m.entries).inez, 0))}
                                             </td>
                                             <td className="px-6 py-4 text-right text-indigo-700 font-mono text-lg">

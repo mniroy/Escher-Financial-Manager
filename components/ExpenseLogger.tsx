@@ -34,6 +34,7 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
     const [tasks, setTasks] = useState<LogTask[]>([]);
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
+    const [pendingMode, setPendingMode] = useState<'standard' | 'yearly' | null>(null);
 
     // Effect to handle initialData (from WhatsApp bridge)
     useEffect(() => {
@@ -42,32 +43,32 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
         }
     }, [initialData]);
 
+    // Derived active plan info
+    const yearlyBudgetItems = useMemo(() => budgetItems.filter(item => item.frequency === 'Yearly'), [budgetItems]);
+    const activeYearlyPlan = useMemo(() => {
+        if (activePlan) return budgetItems.find(i => i.name === activePlan);
+        return null;
+    }, [activePlan, budgetItems]);
+
     const processInitialData = async (data: any) => {
         const taskId = crypto.randomUUID();
-        setTasks(prev => [{
-            id: taskId,
-            status: 'processing',
-            message: 'Logging WhatsApp receipt...'
-        }, ...prev]);
+        setTasks(prev => [{ id: taskId, status: 'processing', message: 'Logging WhatsApp receipt...' }, ...prev]);
 
         try {
             const { amount, merchant, date, category, base64Image, messageId, mimeType } = data;
 
-            const finalCategory = activeYearlyPlan ? activeYearlyPlan.category : (category as BudgetCategory);
-            const finalPlanName = activeYearlyPlan ? activeYearlyPlan.name : undefined;
+            // For WA, prioritize current UI context if set, else use AI suggestions
+            const plan = activeYearlyPlan || (appMode === 'yearly' && activePlan ? budgetItems.find(i => i.name === activePlan) : null);
+            const finalCategory = plan ? plan.category : (category as BudgetCategory);
+            const finalPlanName = plan ? plan.name : undefined;
+
             const expenseDate = date || new Date().toISOString().split('T')[0];
             const description = merchant || 'WhatsApp Receipt';
-
             const dateSlug = expenseDate.replace(/-/g, '');
             const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
             const expenseId = `${dateSlug}-${finalCategory.replace(/\s+/g, '')}-${descSlug}`;
 
-            const receiptFileName = `receipt-${expenseId}.${mimeType?.split('/')[1] || 'jpg'}`;
-            let receiptUrl = '';
-
             let finalBase64 = base64Image;
-
-            // If we have a messageId but no base64 (standard bridge flow), fetch from WAHA
             if (messageId && !finalBase64) {
                 const waha = getWahaConfig();
                 if (waha.apiUrl) {
@@ -77,360 +78,215 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                         if (res.ok) {
                             const buffer = await res.arrayBuffer();
                             const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
-                            // Convert to base64 for Drive upload
                             const reader = new FileReader();
                             finalBase64 = await new Promise((resolve) => {
-                                reader.onloadend = () => {
-                                    const base64 = reader.result as string;
-                                    resolve(base64.split(',')[1]);
-                                };
+                                reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
                                 reader.readAsDataURL(blob);
                             });
                         }
-                    } catch (e) {
-                        console.error("Failed to fetch image from WAHA", e);
-                    }
+                    } catch (e) { console.error(e); }
                 }
             }
 
+            let receiptUrl = '';
             if (finalBase64) {
+                const fileName = `receipt-${expenseId}.${mimeType?.split('/')[1] || 'jpg'}`;
                 try {
-                    receiptUrl = await onUploadReceipt(finalBase64, mimeType || 'image/jpeg', receiptFileName, expenseDate);
-                } catch (e) {
-                    console.warn('Failed upload', e);
-                    receiptUrl = 'upload-failed';
-                }
+                    receiptUrl = await onUploadReceipt(finalBase64, mimeType || 'image/jpeg', fileName, expenseDate);
+                } catch (e) { receiptUrl = 'upload-failed'; }
             }
 
-            const newExpense: Expense = {
+            await onSave({
                 id: expenseId,
                 amount,
                 category: finalCategory,
                 date: expenseDate,
                 description,
-                receiptUrl,
+                receiptUrl: receiptUrl === 'upload-failed' ? '' : receiptUrl,
                 budgetItemName: finalPlanName
-            };
-
-            await onSave(newExpense);
+            });
 
             setTasks(prev => prev.map(t => t.id === taskId ? {
-                ...t,
-                status: 'success',
-                message: 'Saved from WhatsApp!',
-                detail: `${description} - ${formatCurrency(amount)}`
+                ...t, status: 'success', message: 'Saved!', detail: `${description} - ${formatCurrency(amount)}`
             } : t));
         } catch (error: any) {
-            setTasks(prev => prev.map(t => t.id === taskId ? {
-                ...t, status: 'error', message: 'Bridge failed', detail: error.message
-            } : t));
+            setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'error', message: 'Failed', detail: error.message } : t));
         }
     };
 
-    // Filter only Yearly items for the dropdown
-    const yearlyBudgetItems = useMemo(() => {
-        return budgetItems.filter(item => item.frequency === 'Yearly');
-    }, [budgetItems]);
-
-    // Derived active plan based on global props
-    const activeYearlyPlan = useMemo(() => {
-        if (appMode === 'yearly' && activePlan) {
-            return budgetItems.find(i => i.name === activePlan);
+    const triggerUpload = (mode: 'standard' | 'yearly', type: 'camera' | 'file') => {
+        if (mode === 'yearly' && !activePlan) {
+            alert("Please select an Annual Plan context first.");
+            return;
         }
-        return null;
-    }, [appMode, activePlan, budgetItems]);
+        setPendingMode(mode);
+        if (type === 'camera') cameraInputRef.current?.click();
+        else uploadInputRef.current?.click();
+    };
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
+        if (e.target.files?.[0]) {
             const file = e.target.files[0];
             const taskId = crypto.randomUUID();
+            const loggingMode = pendingMode;
 
-            // 1. Immediate UI Feedback (Non-blocking)
-            const newTask: LogTask = {
-                id: taskId,
-                status: 'processing',
-                message: 'Photo received. AI analyzing in background...'
-            };
-
-            // Prepend new task
-            setTasks(prev => [newTask, ...prev]);
-
-            // Clear input immediately so user can upload another or leave
+            setTasks(prev => [{ id: taskId, status: 'processing', message: 'Analyzing photo...' }, ...prev]);
             e.target.value = '';
 
-            // 2. Background Process
             try {
                 const base64Data = await fileToGenerativePart(file);
-                const mimeType = file.type;
+                const result = await analyzeReceipt(base64Data, file.type);
 
-                // AI Analysis
-                const result = await analyzeReceipt(base64Data, mimeType);
+                let finalCategory: BudgetCategory;
+                let finalPlanName: string | undefined;
 
-                // Logic & categorization
-                const finalCategory = activeYearlyPlan ? activeYearlyPlan.category : (result.category as BudgetCategory);
-                const finalPlanName = activeYearlyPlan ? activeYearlyPlan.name : undefined;
-                const expenseDate = result.date || new Date().toISOString().split('T')[0];
-                const description = result.merchant || 'Receipt Expense';
-
-                // Generate human-readable ID: YYYYMMDD-Category-description
-                const dateSlug = expenseDate.replace(/-/g, '');
-                const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
-                const expenseId = `${dateSlug}-${finalCategory.replace(/\s+/g, '')}-${descSlug}`;
-
-                // Upload receipt image to Google Drive (organized by year/month)
-                const receiptFileName = `receipt-${expenseId}.${mimeType.split('/')[1] || 'jpg'}`;
-                let receiptUrl = '';
-                try {
-                    receiptUrl = await onUploadReceipt(base64Data, mimeType, receiptFileName, expenseDate);
-                } catch (uploadError) {
-                    console.warn('Failed to upload receipt to Drive, continuing without it', uploadError);
-                    receiptUrl = 'upload-failed';
+                if (loggingMode === 'yearly' && activePlan) {
+                    const plan = budgetItems.find(i => i.name === activePlan);
+                    finalCategory = plan ? plan.category : (result.category as BudgetCategory);
+                    finalPlanName = plan?.name;
+                    onModeChange('yearly', activePlan);
+                } else {
+                    finalCategory = result.category as BudgetCategory;
+                    onModeChange('standard', '');
                 }
 
-                const newExpense: Expense = {
+                const expenseDate = result.date || new Date().toISOString().split('T')[0];
+                const description = result.merchant || 'Receipt';
+                const expenseId = `${expenseDate.replace(/-/g, '')}-${finalCategory.replace(/\s+/g, '')}-${description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 20)}`;
+                const fileName = `receipt-${expenseId}.${file.type.split('/')[1] || 'jpg'}`;
+
+                let receiptUrl = '';
+                try {
+                    receiptUrl = await onUploadReceipt(base64Data, file.type, fileName, expenseDate);
+                } catch (e) { receiptUrl = 'upload-failed'; }
+
+                await onSave({
                     id: expenseId,
                     amount: result.amount,
                     category: finalCategory,
                     date: expenseDate,
-                    description: description,
-                    receiptUrl: receiptUrl,
+                    description,
+                    receiptUrl: receiptUrl === 'upload-failed' ? '' : receiptUrl,
                     budgetItemName: finalPlanName
-                };
+                });
 
-                // Save to Google Sheets
-                await onSave(newExpense);
-
-                // Update Task Status to Success
-                setTasks(prev => prev.map(t =>
-                    t.id === taskId
-                        ? {
-                            ...t,
-                            status: 'success',
-                            message: 'Saved!',
-                            detail: `${newExpense.description} - ${formatCurrency(newExpense.amount)}`
-                        }
-                        : t
-                ));
-
+                setTasks(prev => prev.map(t => t.id === taskId ? {
+                    ...t, status: 'success', message: 'Saved!', detail: `${description} - ${formatCurrency(result.amount)}`
+                } : t));
             } catch (error: any) {
-                console.error(error);
-                // Update Task Status to Error
-                setTasks(prev => prev.map(t =>
-                    t.id === taskId
-                        ? { ...t, status: 'error', message: 'Failed to process', detail: error.message || 'Unknown error' }
-                        : t
-                ));
+                setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: 'error', message: 'Error', detail: error.message } : t));
+            } finally {
+                setPendingMode(null);
             }
         }
     };
 
-    const removeTask = (id: string) => {
-        setTasks(prev => prev.filter(t => t.id !== id));
-    };
-
     return (
-        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="max-w-4xl mx-auto space-y-6">
+            {/* Input Panels */}
+            <div className="bg-white rounded-[2rem] shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100">
 
-            {/* Mode Selector */}
-            <div className="p-4 bg-gray-50 border-b border-gray-200">
-                <div className="flex gap-2">
-                    {/* Standard Mode */}
-                    <button
-                        onClick={() => onModeChange('standard', '')}
-                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${appMode === 'standard'
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                            }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <CreditCard className={`w-5 h-5 ${appMode === 'standard' ? 'text-indigo-600' : 'text-gray-400'}`} />
-                            <div className="text-left">
-                                <div className={`text-sm font-semibold ${appMode === 'standard' ? 'text-indigo-900' : 'text-gray-600'}`}>Standard</div>
-                                <div className="text-[10px] text-gray-400">Daily spending</div>
+                    {/* Standard Section */}
+                    <div className="p-8 md:p-10 bg-gradient-to-b from-white to-gray-50/30">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="p-4 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-100">
+                                <CreditCard className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900">Daily Spending</h2>
+                                <p className="text-[10px] text-indigo-500 font-bold uppercase tracking-widest">Standard Entry</p>
                             </div>
                         </div>
-                    </button>
 
-                    {/* Yearly Mode */}
-                    <button
-                        onClick={() => {
-                            if (appMode !== 'yearly') {
-                                const defaultPlan = yearlyBudgetItems[0]?.name || '';
-                                onModeChange('yearly', defaultPlan);
-                            }
-                        }}
-                        className={`flex-1 p-3 rounded-lg border-2 transition-all ${appMode === 'yearly'
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 bg-white hover:border-gray-300'
-                            }`}
-                    >
-                        <div className="flex items-center gap-2">
-                            <Plane className={`w-5 h-5 ${appMode === 'yearly' ? 'text-purple-600' : 'text-gray-400'}`} />
-                            <div className="text-left">
-                                <div className={`text-sm font-semibold ${appMode === 'yearly' ? 'text-purple-900' : 'text-gray-600'}`}>Annual</div>
-                                <div className="text-[10px] text-gray-400">Events mode</div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => triggerUpload('standard', 'camera')}
+                                className="flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed border-indigo-100 rounded-3xl hover:border-indigo-500 hover:bg-indigo-50 hover:shadow-md transition-all active:scale-95 group"
+                            >
+                                <Camera className="w-8 h-8 text-indigo-600 mb-3 group-hover:scale-110 transition-transform" />
+                                <span className="text-sm font-bold text-gray-700">Scan</span>
+                            </button>
+                            <button
+                                onClick={() => triggerUpload('standard', 'file')}
+                                className="flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed border-indigo-100 rounded-3xl hover:border-indigo-500 hover:bg-indigo-50 hover:shadow-md transition-all active:scale-95 group"
+                            >
+                                <Upload className="w-8 h-8 text-indigo-600 mb-3 group-hover:scale-110 transition-transform" />
+                                <span className="text-sm font-bold text-gray-700">Upload</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Annual Section */}
+                    <div className="p-8 md:p-10 bg-gradient-to-b from-white to-gray-50/30">
+                        <div className="flex items-center gap-4 mb-8">
+                            <div className="p-4 bg-purple-600 rounded-2xl text-white shadow-lg shadow-purple-100">
+                                <Plane className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-black text-gray-900">Events & Plans</h2>
+                                <p className="text-[10px] text-purple-500 font-bold uppercase tracking-widest">Annual Budgeting</p>
                             </div>
                         </div>
-                    </button>
+
+                        <div className="mb-6 space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Assigned Plan</label>
+                            <select
+                                value={activePlan}
+                                onChange={(e) => onModeChange('yearly', e.target.value)}
+                                className="w-full rounded-2xl border-purple-100 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-3.5 px-4 bg-white text-purple-900 font-bold text-sm transition-all cursor-pointer"
+                            >
+                                <option value="">-- Choose Accountable Plan --</option>
+                                {yearlyBudgetItems.map((item, idx) => (
+                                    <option key={idx} value={item.name}>{item.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <button
+                                onClick={() => triggerUpload('yearly', 'camera')}
+                                className={`flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed rounded-3xl transition-all group ${!activePlan ? 'opacity-30 cursor-not-allowed grayscale' : 'border-purple-100 hover:border-purple-500 hover:bg-purple-50 active:scale-95 shadow-sm'}`}
+                            >
+                                <Camera className="w-8 h-8 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
+                                <span className="text-sm font-bold text-gray-700">Scan</span>
+                            </button>
+                            <button
+                                onClick={() => triggerUpload('yearly', 'file')}
+                                className={`flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed rounded-3xl transition-all group ${!activePlan ? 'opacity-30 cursor-not-allowed grayscale' : 'border-purple-100 hover:border-purple-500 hover:bg-purple-50 active:scale-95 shadow-sm'}`}
+                            >
+                                <Upload className="w-8 h-8 text-purple-600 mb-3 group-hover:scale-110 transition-transform" />
+                                <span className="text-sm font-bold text-gray-700">Upload</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Yearly Plan Dropdown */}
-                {appMode === 'yearly' && (
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                        <select
-                            value={activePlan}
-                            onChange={(e) => onModeChange('yearly', e.target.value)}
-                            className="w-full rounded-lg border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2 px-3 bg-white text-purple-900 font-medium text-sm"
-                        >
-                            <option value="">-- Select Plan --</option>
-                            {yearlyBudgetItems.map((item, idx) => (
-                                <option key={idx} value={item.name}>{item.name} ({formatCurrency(item.amount)})</option>
-                            ))}
-                        </select>
-                    </div>
-                )}
+                <input type="file" accept="image/*" capture="environment" className="hidden" ref={cameraInputRef} onChange={handleFileSelect} />
+                <input type="file" accept="image/*" className="hidden" ref={uploadInputRef} onChange={handleFileSelect} />
             </div>
 
-            {/* Context Banner */}
-            <div className={`p-4 border-b ${appMode === 'yearly' ? 'bg-purple-50 border-purple-100' : 'bg-indigo-50 border-indigo-100'
-                }`}>
-                {activeYearlyPlan ? (
-                    <div className="flex items-start gap-3">
-                        <div className="p-2 bg-purple-100 rounded-full text-purple-700">
-                            <Plane className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-purple-900 text-sm">Mode: {activeYearlyPlan.name}</h3>
-                            <p className="text-xs text-purple-700">Auto-logging to: <strong>{activeYearlyPlan.category}</strong></p>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="flex items-start gap-3">
-                        <div className="p-2 bg-indigo-100 rounded-full text-indigo-700">
-                            <CreditCard className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-indigo-900 text-sm">Mode: Standard Spending</h3>
-                            <p className="text-xs text-indigo-700">Auto-categorization active.</p>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            <div className="p-6">
-
-                {/* Hidden Input for Camera */}
-                <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    ref={cameraInputRef}
-                    onChange={handleFileSelect}
-                />
-
-                {/* Hidden Input for File Upload */}
-                <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    ref={uploadInputRef}
-                    onChange={handleFileSelect}
-                />
-
-                {/* TRIGGER AREA */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                    {/* Camera Button */}
-                    <div
-                        onClick={() => cameraInputRef.current?.click()}
-                        className={`group cursor-pointer flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed rounded-2xl transition-all ${appMode === 'yearly' && !activeYearlyPlan
-                            ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                            : 'border-indigo-200 bg-indigo-50 hover:bg-indigo-100 hover:border-indigo-300 active:scale-95'
-                            }`}
-                        style={{ pointerEvents: (appMode === 'yearly' && !activeYearlyPlan) ? 'none' : 'auto' }}
-                    >
-                        <div className="bg-white p-3 md:p-4 rounded-full shadow-sm mb-3 md:mb-4 group-hover:scale-110 transition-transform">
-                            <Camera className={`w-6 h-6 md:w-8 md:h-8 ${appMode === 'yearly' ? 'text-purple-600' : 'text-indigo-600'}`} />
-                        </div>
-                        <h3 className="text-sm md:text-lg font-bold text-gray-800 mb-1">Take Photo</h3>
-                    </div>
-
-                    {/* Upload Button */}
-                    <div
-                        onClick={() => uploadInputRef.current?.click()}
-                        className={`group cursor-pointer flex flex-col items-center justify-center p-6 md:p-8 border-2 border-dashed rounded-2xl transition-all ${appMode === 'yearly' && !activeYearlyPlan
-                            ? 'border-gray-200 bg-gray-50 opacity-50 cursor-not-allowed'
-                            : 'border-indigo-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 active:scale-95'
-                            }`}
-                        style={{ pointerEvents: (appMode === 'yearly' && !activeYearlyPlan) ? 'none' : 'auto' }}
-                    >
-                        <div className="bg-indigo-50 p-3 md:p-4 rounded-full shadow-sm mb-3 md:mb-4 group-hover:scale-110 transition-transform">
-                            <Upload className={`w-6 h-6 md:w-8 md:h-8 ${appMode === 'yearly' ? 'text-purple-600' : 'text-indigo-600'}`} />
-                        </div>
-                        <h3 className="text-sm md:text-lg font-bold text-gray-800 mb-1">Upload File</h3>
-                    </div>
-
-                    <div className="col-span-2 text-center">
-                        <p className="text-xs text-gray-500">
-                            AI will process receipt in background.<br />
-                            You can close this or add more.
-                        </p>
-                    </div>
-
-                    {appMode === 'yearly' && !activeYearlyPlan && (
-                        <div className="col-span-2 bg-orange-50 text-orange-800 p-4 rounded-lg flex items-center gap-3 text-sm">
-                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                            Please select an active Yearly Plan in the Dashboard to start logging expenses for it.
-                        </div>
-                    )}
-                </div>
-
-                {/* BACKGROUND TASKS LIST */}
-                {tasks.length > 0 && (
-                    <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Recent Activity</h4>
-                        {tasks.map((task) => (
-                            <div key={task.id} className="bg-white border border-gray-100 shadow-sm rounded-lg p-3 flex items-start gap-3 animate-in slide-in-from-bottom-2">
-                                {task.status === 'processing' && (
-                                    <div className="p-2 bg-indigo-50 rounded-full">
-                                        <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
-                                    </div>
-                                )}
-                                {task.status === 'success' && (
-                                    <div className="p-2 bg-emerald-50 rounded-full">
-                                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                                    </div>
-                                )}
-                                {task.status === 'error' && (
-                                    <div className="p-2 bg-red-50 rounded-full">
-                                        <X className="w-4 h-4 text-red-600" />
-                                    </div>
-                                )}
-
-                                <div className="flex-grow">
-                                    <p className={`text-sm font-medium ${task.status === 'error' ? 'text-red-700' : 'text-gray-900'
-                                        }`}>
-                                        {task.message}
-                                    </p>
-                                    {task.detail && (
-                                        <p className="text-xs text-gray-500 mt-0.5">{task.detail}</p>
-                                    )}
-                                </div>
-
-                                {task.status !== 'processing' && (
-                                    <button
-                                        onClick={() => removeTask(task.id)}
-                                        className="text-gray-300 hover:text-gray-500 p-1"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                )}
+            {/* Task Tracker */}
+            {tasks.length > 0 && (
+                <div className="max-w-2xl mx-auto space-y-3">
+                    {tasks.map((task) => (
+                        <div key={task.id} className="bg-white/80 backdrop-blur-md border border-gray-100 p-4 rounded-2xl flex items-center gap-4 shadow-sm animate-in slide-in-from-bottom-2">
+                            {task.status === 'processing' ? <Loader2 className="w-5 h-5 text-indigo-500 animate-spin" /> :
+                                task.status === 'success' ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> :
+                                    <AlertCircle className="w-5 h-5 text-rose-500" />}
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-bold text-gray-900 truncate">{task.message}</p>
+                                {task.detail && <p className="text-xs text-gray-500 font-medium truncate">{task.detail}</p>}
                             </div>
-                        ))}
-                    </div>
-                )}
-
-            </div>
+                            {task.status !== 'processing' && (
+                                <button onClick={() => setTasks(prev => prev.filter(t => t.id !== task.id))} className="text-gray-300 hover:text-gray-500 transition-colors">
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
