@@ -324,7 +324,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
         <main
           ref={contentRef}
           // On mobile: pb-20 for bottom nav. On desktop: pb-0.
-          className="flex-1 w-full overflow-hidden min-h-0 pb-20 md:pb-0"
+          className="flex-1 w-full overflow-y-auto min-h-0 pb-20 md:pb-0 flex flex-col"
         >
           {children}
         </main>
