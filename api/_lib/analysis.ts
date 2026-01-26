@@ -42,6 +42,8 @@ export async function analyzeReceipt(base64Image: string, mimeType: string, apiK
 CONTEXT:
 - Today's date is ${currentDate}.
 - Use this as reference when parsing the year (e.g., if you see "26", it's likely 2026).
+- CURRENCY CONVERSION: If the receipt is NOT in IDR (Indonesian Rupiah), you MUST convert the total amount to IDR using the latest known exchange rate.
+- RESULT: The "amount" field MUST be in IDR (integer).
 - CRITICAL: Indonesian Rupiah - dots are THOUSAND separators (Rp134.100 = 134100).
 - Categories: ${BUDGET_CATEGORIES.join(', ')}.
 
