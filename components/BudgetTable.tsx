@@ -308,57 +308,81 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, 
     <div className="h-full overflow-y-auto px-4 py-4">
       <div className="space-y-6 pb-20 md:pb-6 relative">
         {/* Top Summary Card */}
-        <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md relative overflow-hidden shrink-0">
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 pointer-events-none blur-3xl"></div>
+          <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-600/20 rounded-full -ml-24 -mb-24 pointer-events-none blur-2xl"></div>
 
-          {/* Toggle Edit Button in Summary Box */}
+          {/* Toggle Edit Button */}
           <button
             onClick={() => setIsEditMode(!isEditMode)}
-            className={`absolute top-3 right-3 z-20 p-2 rounded-full transition-all ${isEditMode
-              ? 'bg-emerald-500 text-white shadow-lg'
+            className={`absolute top-4 right-4 z-20 p-2 rounded-lg transition-all ${isEditMode
+              ? 'bg-emerald-500 text-white shadow-lg ring-2 ring-emerald-400/50'
               : 'bg-white/10 text-indigo-200 hover:bg-white/20 hover:text-white'
               }`}
             title={isEditMode ? "Done Editing" : "Edit Plan"}
           >
-            {isEditMode ? <Check className="w-4 h-4" /> : <Pencil className="w-4 h-4" />}
+            {isEditMode ? <Check className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
           </button>
 
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 pointer-events-none"></div>
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+            {/* Main Total Section (col-span-5) */}
+            <div className="md:col-span-12 lg:col-span-5 text-center lg:text-left">
+              <h3 className="text-indigo-200 text-xs font-bold uppercase tracking-[0.2em] mb-2">Total Annual Budget</h3>
+              <p className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white drop-shadow-sm">
+                {formatCurrency(grandTotal)}
+              </p>
 
-          <div className="z-10 text-center md:text-left flex-1">
-            <h3 className="text-indigo-200 text-sm font-medium uppercase tracking-wider mb-1">Total Annual Budget</h3>
-            <p className="text-3xl md:text-4xl font-extrabold tracking-tight">{formatCurrency(grandTotal)}</p>
-
-            <div className="mt-4 flex items-center justify-center md:justify-start overflow-hidden">
-              <div className="flex bg-white/5 backdrop-blur-md rounded-xl md:rounded-full px-3 md:px-4 py-1.5 md:py-2 border border-white/10 gap-3 md:gap-6 max-w-full">
-                <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0"></div>
-                  <div className="flex flex-col leading-none min-w-0">
-                    <span className="text-[7px] md:text-[8px] text-indigo-300 font-bold uppercase tracking-wider whitespace-nowrap">LY Net Income</span>
-                    <span className="text-[10px] md:text-sm font-bold font-mono tracking-tighter truncate">{formatCurrency(incomeSummary.lyNet)}</span>
+              <div className="mt-6 flex flex-wrap justify-center lg:justify-start gap-3">
+                <div className="flex items-center gap-2 bg-indigo-800/50 px-3 py-1.5 rounded-lg border border-indigo-700">
+                  <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
+                  <div>
+                    <span className="text-[10px] text-indigo-300 block leading-none font-bold uppercase">LY Net</span>
+                    <span className="text-sm font-mono font-bold">{formatCurrency(incomeSummary.lyNet)}</span>
                   </div>
                 </div>
-                <div className="w-px h-4 bg-white/10 self-center shrink-0"></div>
-                <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></div>
-                  <div className="flex flex-col leading-none min-w-0">
-                    <span className="text-[7px] md:text-[8px] text-emerald-300 font-bold uppercase tracking-wider whitespace-nowrap">TY YTD Net Income</span>
-                    <span className="text-[10px] md:text-sm font-bold text-emerald-50 font-mono tracking-tighter truncate">{formatCurrency(incomeSummary.tyNet)}</span>
+                <div className="flex items-center gap-2 bg-emerald-900/40 px-3 py-1.5 rounded-lg border border-emerald-800/50">
+                  <div className="w-2 h-2 rounded-full bg-emerald-400"></div>
+                  <div>
+                    <span className="text-[10px] text-emerald-300 block leading-none font-bold uppercase">TY Net YTD</span>
+                    <span className="text-sm font-mono font-bold text-emerald-100">{formatCurrency(incomeSummary.tyNet)}</span>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 z-10 w-full md:w-auto">
-            <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
-              <p className="text-indigo-200 text-xs mb-1">Annualized Monthly</p>
-              <p className="font-bold text-lg">{formatCurrency(totalMonthly * 12)}</p>
-              <p className="text-[10px] text-indigo-300">({formatCurrency(totalMonthly)} / mo)</p>
-            </div>
-            <div className="bg-white/10 rounded-lg p-3 flex-1 text-center md:text-right backdrop-blur-sm">
-              <p className="text-indigo-200 text-xs mb-1">Annual Events</p>
-              <p className="font-bold text-lg">{formatCurrency(totalYearly)}</p>
-              <p className="text-[10px] text-indigo-300">(One-off / Yearly items)</p>
+            {/* Breakdown Stats (col-span-7) */}
+            <div className="md:col-span-12 lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Monthly Card */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors group">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-indigo-200 text-xs font-bold uppercase">Monthly Recurring</span>
+                  <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-indigo-100 opacity-60 group-hover:opacity-100 transition-opacity">x12</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{formatCurrency(totalMonthly * 12)}</span>
+                  <span className="text-xs text-indigo-300 font-medium">/ year</span>
+                </div>
+                <div className="mt-1 pt-2 border-t border-white/10 text-xs text-indigo-200 flex justify-between">
+                  <span>Base Monthly:</span>
+                  <span className="font-mono text-white">{formatCurrency(totalMonthly)}</span>
+                </div>
+              </div>
+
+              {/* Annual Card */}
+              <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:bg-white/15 transition-colors">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-indigo-200 text-xs font-bold uppercase">Annual Events</span>
+                  <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-indigo-100 opacity-60">Yearly</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-2xl font-bold">{formatCurrency(totalYearly)}</span>
+                  <span className="text-xs text-indigo-300 font-medium">/ year</span>
+                </div>
+                <div className="mt-1 pt-2 border-t border-white/10 text-xs text-indigo-200">
+                  <span>One-time & periodic items</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>

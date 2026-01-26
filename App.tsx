@@ -10,7 +10,7 @@ import Login from './components/Login';
 import Settings from './components/Settings';
 
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
-import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet, parseIncomeFromSheet } from './services/googleSheetsService';
+import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet, parseIncomeFromSheet, saveIncomeToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
 import { isTokenExpired, silentRefreshToken } from './services/authService';
 import { Expense, BudgetLineItem, User, IncomeEntry } from './types';
@@ -247,6 +247,47 @@ export default function App() {
     }
   };
 
+  const handleEditIncome = async (updatedIncome: IncomeEntry) => {
+    if (!user) return;
+    try {
+      // Update in local state
+      const updatedIncomeList = incomeData.map(e =>
+        e.id === updatedIncome.id ? updatedIncome : e
+      );
+      setIncomeData(updatedIncomeList);
+
+      // Save to Google Sheets
+      await saveIncomeToSheet(user, updatedIncomeList);
+    } catch (error: any) {
+      console.error("Edit Income Error", error);
+      if (error.message === 'TOKEN_EXPIRED') {
+        alert("Session expired. Please log in again.");
+        handleLogout();
+      } else {
+        alert("Failed to update income. Please try again.");
+        loadData(user);
+      }
+    }
+  };
+
+  const handleDeleteIncome = async (incomeId: string) => {
+    if (!user) return;
+    try {
+      const updatedIncomeList = incomeData.filter(e => e.id !== incomeId);
+      setIncomeData(updatedIncomeList);
+      await saveIncomeToSheet(user, updatedIncomeList);
+    } catch (error: any) {
+      console.error("Delete Income Error", error);
+      if (error.message === 'TOKEN_EXPIRED') {
+        alert("Session expired. Please log in again.");
+        handleLogout();
+      } else {
+        alert("Failed to delete income. Please try again.");
+        loadData(user);
+      }
+    }
+  };
+
   // Memoized refresh handler for TransactionList
   const handleRefresh = useCallback(async () => {
     if (user) {
@@ -318,6 +359,7 @@ export default function App() {
           onEditExpense={handleEditExpense}
           onDeleteExpense={handleDeleteExpense}
           onRefresh={handleRefresh}
+          budgetItems={budgetItems}
         />
       )}
       {activeTab === 'chat' && (
@@ -330,7 +372,7 @@ export default function App() {
         />
       )}
       {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} incomeData={incomeData} />}
-      {activeTab === 'income' && <IncomeManager incomeData={incomeData} />}
+      {activeTab === 'income' && <IncomeManager incomeData={incomeData} onEditIncome={handleEditIncome} onDeleteIncome={handleDeleteIncome} />}
       {activeTab === 'settings' && <Settings />}
     </Layout>
   );

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
-import { Expense, BudgetCategory } from '../types';
+import { Expense, BudgetCategory, BudgetLineItem } from '../types';
 import { formatCurrency } from '../constants';
 import { ArrowUpDown, Pencil, Trash2, X, Save, Check, BarChart3, Calendar, Plane, RefreshCw } from 'lucide-react';
 
@@ -9,6 +9,7 @@ interface TransactionListProps {
     onEditExpense: (expense: Expense) => Promise<void>;
     onDeleteExpense: (expenseId: string) => Promise<void>;
     onRefresh?: () => Promise<void>;
+    budgetItems?: BudgetLineItem[];
 }
 
 const TransactionList: React.FC<TransactionListProps> = ({
@@ -16,6 +17,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
     onEditExpense,
     onDeleteExpense,
     onRefresh,
+    budgetItems = [],
 }) => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [selectedDate] = useState(new Date());
@@ -187,253 +189,212 @@ const TransactionList: React.FC<TransactionListProps> = ({
     };
 
     return (
-        <div className="flex flex-col gap-2 p-3 h-full overflow-hidden">
-            {/* Chart Section with Integrated Header */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 flex-shrink-0">
-                {/* Header Row - Compact */}
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-sm font-semibold text-gray-800">Transactions</h2>
-                    <div className="flex items-center gap-1">
-                        {/* Refresh Button */}
-                        {onRefresh && (
-                            <button
-                                onClick={async () => {
-                                    setIsRefreshing(true);
-                                    try {
-                                        await onRefresh();
-                                    } finally {
-                                        setIsRefreshing(false);
-                                    }
-                                }}
-                                disabled={isRefreshing}
-                                className={`p-1.5 rounded-lg transition-all ${isRefreshing
-                                    ? 'bg-indigo-100 text-indigo-400'
-                                    : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                    }`}
-                                title="Refresh from Google Sheets"
-                            >
-                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                            </button>
-                        )}
-                        {/* Chart Toggle */}
-                        <button
-                            onClick={() => setShowChart(!showChart)}
-                            className={`p-1.5 rounded-lg transition-all ${showChart
-                                ? 'bg-indigo-500 text-white'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                }`}
-                            title={showChart ? "Hide Chart" : "Show Chart"}
-                        >
-                            <BarChart3 className="w-3.5 h-3.5" />
-                        </button>
-                        {/* Edit Toggle */}
-                        <button
-                            onClick={() => setIsEditMode(!isEditMode)}
-                            className={`p-1.5 rounded-lg transition-all ${isEditMode
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                }`}
-                            title={isEditMode ? "Done Editing" : "Edit Mode"}
-                        >
-                            {isEditMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
-                        </button>
+        <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+
+            {/* TOP: Chart & Controls (Collapse when editing to save space on small screens, or keep fixed height) */}
+            <div className="shrink-0 p-4 pb-0 flex flex-col gap-4 animate-in slide-in-from-top-4 duration-500">
+                {/* Chart Section */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                        <div>
+                            <div className="flex items-center gap-2 mb-1">
+                                <h2 className="text-base font-bold text-gray-800">Spending Overview</h2>
+                                {onRefresh && (
+                                    <button
+                                        onClick={async () => {
+                                            setIsRefreshing(true);
+                                            try { await onRefresh(); } finally { setIsRefreshing(false); }
+                                        }}
+                                        disabled={isRefreshing}
+                                        className={`p-1.5 rounded-lg transition-all ${isRefreshing ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:bg-gray-100'}`}
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-extrabold text-gray-900 tracking-tight">{formatCurrency(chartTotal)}</span>
+                                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Spent</span>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3">
+                            <div className="flex p-1 bg-gray-100/80 rounded-xl">
+                                {(['1D', '1W', '1M', '3M', '1Y', 'ALL'] as const).map((range) => (
+                                    <button
+                                        key={range}
+                                        onClick={() => setChartRange(range)}
+                                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${chartRange === range
+                                            ? 'bg-white text-indigo-600 shadow-sm'
+                                            : 'text-gray-400 hover:text-gray-600'
+                                            }`}
+                                    >
+                                        {range}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-100 self-start md:self-end">
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-2">Sort</span>
+                                <button
+                                    onClick={() => setSortBy('date')}
+                                    className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${sortBy === 'date'
+                                        ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    Date
+                                </button>
+                                <button
+                                    onClick={() => setSortBy('category')}
+                                    className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1 transition-all ${sortBy === 'category'
+                                        ? 'bg-white text-indigo-600 shadow-sm border border-gray-200'
+                                        : 'text-gray-500 hover:text-gray-700'
+                                        }`}
+                                >
+                                    Category
+                                </button>
+                                <div className="w-px h-4 bg-gray-300 mx-1"></div>
+                                <button
+                                    onClick={() => setIsEditMode(!isEditMode)}
+                                    className={`p-1 rounded-md transition-all ${isEditMode ? 'bg-emerald-100 text-emerald-700' : 'text-gray-400 hover:text-gray-600'}`}
+                                    title={isEditMode ? "Done Editing" : "Manage"}
+                                >
+                                    {isEditMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                {/* Total Display - Compact */}
-                <div className="flex items-baseline gap-2 mb-2">
-                    <p className="text-xl font-bold text-gray-900">{formatCurrency(chartTotal)}</p>
-                    <p className="text-[10px] text-gray-400">{filteredExpenses.length} items • Avg: {formatCurrency(chartAvg)}/day</p>
-                </div>
-
-                {/* Range Selector */}
-                <div className="flex justify-around mb-3 border-b border-gray-100 pb-2">
-                    {(['1D', '1W', '1M', '3M', '1Y', 'ALL'] as const).map((range) => (
-                        <button
-                            key={range}
-                            onClick={() => setChartRange(range)}
-                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${chartRange === range
-                                ? 'bg-gray-100 text-gray-900 border border-gray-300'
-                                : 'text-gray-500 hover:text-gray-700'
-                                }`}
-                        >
-                            {range}
-                        </button>
-                    ))}
-                </div>
-
-                {/* Chart */}
-                {showChart && (
-                    <div className="h-28">
+                    {/* Chart */}
+                    <div className="h-48 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
+                            <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="colorSpending" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="#818cf8" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <XAxis
                                     dataKey="shortLabel"
-                                    axisLine={false}
+                                    itemStyle={{ fontSize: 10 }}
+                                    tick={{ fontSize: 10, fill: '#9ca3af' }}
                                     tickLine={false}
-                                    tick={{ fontSize: 9, fill: '#9ca3af' }}
-                                    interval={'preserveStartEnd'}
+                                    axisLine={false}
+                                    interval="preserveStartEnd"
                                 />
                                 <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: '#1f2937',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontSize: '11px',
-                                        color: '#fff'
-                                    }}
-                                    formatter={(value: number) => [formatCurrency(value), 'Spent']}
-                                    labelFormatter={(label) => label}
+                                    cursor={{ stroke: '#e5e7eb' }}
+                                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                                 />
                                 <Area
                                     type="monotone"
                                     dataKey="amount"
                                     stroke="#6366f1"
-                                    strokeWidth={1.5}
+                                    strokeWidth={3}
                                     fill="url(#colorSpending)"
+                                    animationDuration={1000}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
-                )}
-            </div>
 
-            {/* Sort Controls Only */}
-            <div className="flex items-center justify-between bg-white p-2 rounded-xl shadow-sm border border-gray-100 flex-shrink-0">
-                <span className="text-xs text-gray-500 font-medium">Sort by:</span>
-                <div className="bg-gray-100 p-0.5 rounded-lg flex shadow-inner">
-                    <button
-                        onClick={() => setSortBy('date')}
-                        className={`px-2 py-1.5 rounded-md text-xs font-medium flex items-center gap-1 transition-all ${sortBy === 'date'
-                            ? 'bg-white text-gray-700 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        <ArrowUpDown className="w-3 h-3" />
-                        Date
-                    </button>
-                    <button
-                        onClick={() => setSortBy('category')}
-                        className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${sortBy === 'category'
-                            ? 'bg-white text-gray-700 shadow-sm'
-                            : 'text-gray-500 hover:text-gray-700'
-                            }`}
-                    >
-                        Category
-                    </button>
+                    <div className="text-center mt-2">
+                        <p className="text-xs text-gray-400 font-medium">{filteredExpenses.length} transactions • Avg {formatCurrency(chartAvg)}/day</p>
+                    </div>
                 </div>
             </div>
 
-            {/* Transaction List */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 flex-1 min-h-0 flex flex-col overflow-hidden">
-                {sortedExpenses.length === 0 ? (
-                    <div className="p-8 text-center text-gray-500">
-                        <Calendar className="w-10 h-10 mx-auto mb-2 text-gray-300" />
-                        <p className="font-medium text-sm">No transactions</p>
-                        <p className="text-xs mt-1">for selected period</p>
-                    </div>
-                ) : (
-                    <>
-                        {/* Mobile View - Compact */}
-                        <div className="md:hidden divide-y divide-gray-100 flex-1 overflow-y-auto overscroll-contain" style={{ touchAction: 'pan-y' }}>
-                            {sortedExpenses.map((expense) => {
-                                const expDate = new Date(expense.date);
-                                return (
-                                    <div key={expense.id} className="p-3 flex items-center gap-3">
-                                        {/* Big Day Number */}
-                                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                            <span className="text-sm font-bold text-gray-900">{expDate.getDate()}</span>
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between gap-2">
-                                                <span className="font-medium text-gray-900 text-sm truncate">{expense.description}</span>
-                                                <span className="font-bold text-gray-900 text-sm whitespace-nowrap">{formatCurrency(expense.amount)}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-500 flex-wrap">
-                                                <span className="px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
-                                                    {expense.category}
-                                                </span>
-                                                {expense.budgetItemName && (
-                                                    <span className="px-1.5 py-0.5 rounded-full bg-purple-50 text-purple-700 font-medium">
-                                                        {expense.budgetItemName}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {isEditMode && (
-                                            <div className="flex gap-1 animate-in fade-in slide-in-from-right-2">
-                                                <button
-                                                    onClick={() => handleEdit(expense)}
-                                                    className="p-1.5 text-indigo-600 bg-indigo-50 rounded-md"
-                                                >
-                                                    <Pencil className="w-3.5 h-3.5" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(expense.id)}
-                                                    className="p-1.5 text-red-600 bg-red-50 rounded-md"
-                                                >
-                                                    <Trash2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+            {/* BOTTOM: Transaction List & Edit Panel Container */}
+            <div className="flex-1 flex min-h-0 p-4 gap-6 overflow-hidden relative">
 
-                        {/* Desktop View - Compact */}
-                        <div className="hidden md:flex md:flex-col flex-1 overflow-y-auto overscroll-contain">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50 sticky top-0">
+                {/* List Container - Flex Grow/Shrink based on modal state */}
+                <div className={`flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 ease-in-out flex-1 min-w-0`}>
+                    <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 block shrink-0">
+                        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                            History
+                            <span className="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-medium">{sortedExpenses.length}</span>
+                        </h3>
+                    </div>
+
+                    <div className="flex-1 overflow-auto bg-white min-h-0">
+                        {sortedExpenses.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-gray-400 h-full">
+                                <Calendar className="w-12 h-12 mb-3 opacity-20" />
+                                <p className="font-medium">No transactions found</p>
+                                <p className="text-sm">Try adjusting the filter range</p>
+                            </div>
+                        ) : (
+                            <table className="min-w-full divide-y divide-gray-100">
+                                <thead className="bg-gray-50/80 sticky top-0 z-10 backdrop-blur-sm">
                                     <tr>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-                                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
-                                        {isEditMode && <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>}
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-24">Date</th>
+                                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Details</th>
+                                        <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">Category</th>
+                                        <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Amount</th>
+                                        {isEditMode && <th className="px-6 py-3 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">Actions</th>}
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className="bg-white divide-y divide-gray-50">
                                     {sortedExpenses.map((expense) => {
                                         const expDate = new Date(expense.date);
+                                        const isEditingThis = editingExpense?.id === expense.id;
                                         return (
-                                            <tr key={expense.id} className="hover:bg-gray-50">
-                                                <td className="px-4 py-2 whitespace-nowrap">
-                                                    <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                                                        <span className="text-sm font-bold text-gray-900">{expDate.getDate()}</span>
+                                            <tr
+                                                key={expense.id}
+                                                onClick={() => handleEdit(expense)}
+                                                className={`group transition-colors cursor-pointer ${isEditingThis ? 'bg-indigo-50/50' : 'hover:bg-gray-50/80'}`}
+                                            >
+                                                <td className="px-6 py-4 whitespace-nowrap align-top">
+                                                    <div className="flex items-center">
+                                                        <div className={`w-9 h-9 rounded-lg flex flex-col items-center justify-center font-medium border transition-colors ${isEditingThis ? 'bg-white border-indigo-200 text-indigo-600' : 'bg-gray-50 border-gray-100 text-gray-500 group-hover:bg-white group-hover:border-indigo-200 group-hover:text-indigo-600'}`}>
+                                                            <span className="text-[10px] uppercase leading-none">{expDate.toLocaleString('default', { month: 'short' })}</span>
+                                                            <span className="text-sm font-bold leading-none">{expDate.getDate()}</span>
+                                                        </div>
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm">
-                                                    <div className="flex flex-col items-start gap-0.5">
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-100 text-blue-800">
-                                                            {expense.category}
-                                                        </span>
+                                                <td className="px-6 py-4 align-top">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-sm font-semibold text-gray-900 line-clamp-2">{expense.description}</span>
+                                                        <div className="flex flex-wrap gap-1 mt-1 sm:hidden">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                                                {expense.category}
+                                                            </span>
+                                                        </div>
                                                         {expense.budgetItemName && (
-                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-purple-100 text-purple-800">
-                                                                <Plane className="w-2.5 h-2.5 mr-0.5" />
+                                                            <span className="inline-flex items-center gap-1 mt-1 text-xs text-purple-600 font-medium">
+                                                                <Plane className="w-3 h-3" />
                                                                 {expense.budgetItemName}
                                                             </span>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-700">{expense.description}</td>
-                                                <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-gray-900 font-medium">
-                                                    {formatCurrency(expense.amount)}
+                                                <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap align-top">
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200 group-hover:bg-indigo-50 group-hover:text-indigo-700 group-hover:border-indigo-100 transition-colors">
+                                                        {expense.category}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right align-top">
+                                                    <span className="text-sm font-bold text-gray-900 font-mono tracking-tight">
+                                                        {formatCurrency(expense.amount)}
+                                                    </span>
                                                 </td>
                                                 {isEditMode && (
-                                                    <td className="px-4 py-2 whitespace-nowrap text-right text-sm animate-in fade-in">
-                                                        <button onClick={() => handleEdit(expense)} className="text-indigo-600 hover:text-indigo-900 mx-0.5">
-                                                            <Pencil className="w-4 h-4" />
-                                                        </button>
-                                                        <button onClick={() => handleDelete(expense.id)} className="text-red-600 hover:text-red-900 mx-0.5">
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </button>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm align-top">
+                                                        <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleEdit(expense); }}
+                                                                className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                                                            >
+                                                                <Pencil className="w-4 h-4" />
+                                                            </button>
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); handleDelete(expense.id); }}
+                                                                className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                                                            >
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 )}
                                             </tr>
@@ -441,40 +402,37 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                     })}
                                 </tbody>
                             </table>
-                        </div>
-                    </>
-                )}
-            </div>
+                        )}
+                    </div>
+                </div>
 
-            {/* Edit Modal */}
-            {isModalOpen && editingExpense && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center">
-                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsModalOpen(false)} />
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden relative z-10">
-                        <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                            <h3 className="font-bold text-gray-800">Edit Transaction</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                {/* Edit Panel (Side) - Integrated */}
+                {isModalOpen && editingExpense && (
+                    <div className={`w-full md:w-2/5 lg:w-1/3 bg-white rounded-2xl shadow-xl border border-gray-200 flex flex-col animate-in slide-in-from-right-8 duration-300 absolute md:relative right-0 top-4 bottom-4 md:top-0 md:bottom-0 md:h-full z-20`}>
+                        <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
+                            <h3 className="font-bold text-gray-800 text-lg">Edit Transaction</h3>
+                            <button onClick={() => { setIsModalOpen(false); setEditingExpense(null); }} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                                 <X className="w-5 h-5" />
                             </button>
                         </div>
 
-                        <div className="p-4 space-y-3">
+                        <div className="p-6 overflow-y-auto flex-1 space-y-5">
                             <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Date</label>
                                 <input
                                     type="date"
                                     value={editingExpense.date}
                                     onChange={(e) => setEditingExpense({ ...editingExpense, date: e.target.value })}
-                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 border px-3 text-sm"
+                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 text-sm font-medium"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Category</label>
                                 <select
                                     value={editingExpense.category}
                                     onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value as BudgetCategory })}
-                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 border px-3 bg-white text-sm"
+                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 bg-white text-sm font-medium"
                                 >
                                     {Object.values(BudgetCategory).map(cat => (
                                         <option key={cat} value={cat}>{cat}</option>
@@ -483,39 +441,102 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-                                <input
-                                    type="text"
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Description</label>
+                                <textarea
                                     value={editingExpense.description}
                                     onChange={(e) => setEditingExpense({ ...editingExpense, description: e.target.value })}
-                                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 border px-3 text-sm"
+                                    rows={3}
+                                    className="w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 text-sm font-medium resize-none"
                                 />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">Amount</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Amount</label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2 text-gray-500 font-bold text-sm">Rp</span>
+                                    <span className="absolute left-3 top-2.5 text-gray-400 font-bold text-sm">Rp</span>
                                     <input
                                         type="number"
                                         value={editingExpense.amount}
                                         onChange={(e) => setEditingExpense({ ...editingExpense, amount: Number(e.target.value) })}
-                                        className="pl-9 w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 border px-3 text-sm"
+                                        className="pl-9 w-full rounded-xl border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 px-3 text-sm font-bold text-gray-900"
                                     />
                                 </div>
                             </div>
 
+                            {/* Annual Spend Option */}
+                            <div className="pt-4 mt-2 border-t border-gray-100">
+                                <label className="flex items-center gap-3 cursor-pointer mb-3 group">
+                                    <div className="relative flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            checked={!!editingExpense.budgetItemName}
+                                            onChange={(e) => {
+                                                if (e.target.checked) {
+                                                    const firstYearly = budgetItems.find(i => i.frequency === 'Yearly');
+                                                    if (firstYearly) {
+                                                        setEditingExpense({
+                                                            ...editingExpense,
+                                                            budgetItemName: firstYearly.name,
+                                                            category: firstYearly.category
+                                                        });
+                                                    } else {
+                                                        alert("No yearly plans found in your budget. Please add one first.");
+                                                    }
+                                                } else {
+                                                    setEditingExpense({ ...editingExpense, budgetItemName: undefined });
+                                                }
+                                            }}
+                                            className="peer h-5 w-5 cursor-pointer appearance-none rounded-md border border-gray-300 transition-all checked:border-purple-500 checked:bg-purple-500"
+                                        />
+                                        <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100">
+                                            <Check className="w-3.5 h-3.5" />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm font-bold text-gray-700">
+                                        <div className="p-1 bg-purple-100 rounded text-purple-600">
+                                            <Plane className="w-3.5 h-3.5" />
+                                        </div>
+                                        <span>Link to Event / Plan</span>
+                                    </div>
+                                </label>
+
+                                {editingExpense.budgetItemName && (
+                                    <div className="animate-in fade-in slide-in-from-top-2">
+                                        <select
+                                            value={editingExpense.budgetItemName}
+                                            onChange={(e) => {
+                                                const item = budgetItems.find(i => i.name === e.target.value);
+                                                if (item) {
+                                                    setEditingExpense({
+                                                        ...editingExpense,
+                                                        budgetItemName: item.name,
+                                                        category: item.category
+                                                    });
+                                                }
+                                            }}
+                                            className="w-full rounded-xl border-purple-200 shadow-sm focus:border-purple-500 focus:ring-purple-500 py-2.5 border px-3 bg-purple-50/30 text-purple-900 text-sm font-semibold"
+                                        >
+                                            {budgetItems.filter(i => i.frequency === 'Yearly').map(item => (
+                                                <option key={item.name} value={item.name}>{item.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl">
                             <button
                                 onClick={handleSaveEdit}
-                                className="w-full bg-indigo-600 text-white py-2.5 px-4 rounded-lg font-medium hover:bg-indigo-700 flex items-center justify-center gap-2 text-sm"
+                                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-xl font-bold hover:bg-indigo-700 flex items-center justify-center gap-2 text-sm shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
                             >
                                 <Save className="w-4 h-4" />
                                 Save Changes
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

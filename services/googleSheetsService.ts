@@ -269,7 +269,87 @@ export const parseIncomeFromSheet = (values: any[][]): import('../types').Income
       totalIncome: parseAmount(row[7]),
       deduction: parseAmount(row[8]),
       takeHomePay: parseAmount(row[9]),
-      paymentMethod: row[10] || ''
+      paymentMethod: row[10] || '',
+      id: row[11] || crypto.randomUUID()
     };
   });
+};
+
+export const saveIncomeToSheet = async (user: User, incomeEntries: import('../types').IncomeEntry[]) => {
+  if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
+
+  // Format desc for sheet (keeping header row intact)
+  // Columns: Date, Month, Person, Source, Category, Base, Allowance, Total, Deduction, Net, PaymentMethod, ID
+  const rows = incomeEntries.map(entry => [
+    entry.date,
+    entry.month,
+    entry.person,
+    entry.source,
+    entry.category,
+    entry.baseIncome,
+    entry.allowance,
+    entry.totalIncome,
+    entry.deduction,
+    entry.takeHomePay,
+    entry.paymentMethod || '',
+    entry.id || crypto.randomUUID()
+  ]);
+
+  // Clear existing data and write new (starting from row 2 to preserve header)
+  // First, get current row count
+  let currentRowCount = 0;
+  try {
+    const currentData = await fetchSheetValues(user, 'Income!A2:A');
+    if (currentData.values && Array.isArray(currentData.values)) {
+      currentRowCount = currentData.values.length;
+    }
+  } catch (e) {
+    console.warn("Could not get current income count", e);
+  }
+
+  // Write new data
+  if (rows.length > 0) {
+    const writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Income!A2?valueInputOption=USER_ENTERED`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${user.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: 'Income!A2',
+        majorDimension: 'ROWS',
+        values: rows
+      })
+    });
+
+    if (!writeResponse.ok) {
+      if (writeResponse.status === 401) throw new Error("TOKEN_EXPIRED");
+      throw new Error('Failed to update income in Google Sheets');
+    }
+  }
+
+  // Clear any leftover rows if the new list is shorter
+  if (currentRowCount > rows.length) {
+    const startClearRow = 2 + rows.length;
+    const endClearRow = 2 + currentRowCount - 1;
+    const rowsToClearCount = endClearRow - startClearRow + 1;
+    const emptyRows = Array(rowsToClearCount).fill(["", "", "", "", "", "", "", "", "", "", "", ""]); // Clear A-L
+
+    const clearResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/Income!A${startClearRow}?valueInputOption=USER_ENTERED`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${user.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: `Income!A${startClearRow}`,
+        majorDimension: 'ROWS',
+        values: emptyRows
+      })
+    });
+
+    if (!clearResponse.ok) {
+      console.warn('Failed to clean up stale income rows', await clearResponse.text());
+    }
+  }
 };

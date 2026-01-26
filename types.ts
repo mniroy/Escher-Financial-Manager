@@ -95,4 +95,5 @@ export interface IncomeEntry {
   deduction: number;
   takeHomePay: number;
   paymentMethod?: string;
+  id?: string;
 }
