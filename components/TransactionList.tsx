@@ -192,7 +192,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
     };
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+        <div className="flex flex-col flex-1 bg-gray-50 overflow-visible">
 
             {/* TOP: Chart & Controls (Collapse when editing to save space on small screens, or keep fixed height) */}
             <div className="shrink-0 p-4 pb-0 flex flex-col gap-4 animate-in slide-in-from-top-4 duration-500">
@@ -318,10 +318,10 @@ const TransactionList: React.FC<TransactionListProps> = ({
             </div>
 
             {/* BOTTOM: Transaction List & Edit Panel Container */}
-            <div className="flex-1 flex min-h-0 p-4 gap-6 overflow-hidden relative">
+            <div className="flex-1 flex min-h-0 p-4 gap-6 overflow-visible relative">
 
                 {/* List Container - Flex Grow/Shrink based on modal state */}
-                <div className={`flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden transition-all duration-300 ease-in-out flex-1 min-w-0`}>
+                <div className={`flex flex-col bg-white rounded-2xl shadow-sm border border-gray-100 overflow-visible transition-all duration-300 ease-in-out flex-1 min-w-0`}>
                     <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50 block shrink-0">
                         <h3 className="font-bold text-gray-800 flex items-center gap-2">
                             History
@@ -329,7 +329,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                         </h3>
                     </div>
 
-                    <div className="flex-1 overflow-auto bg-white min-h-0">
+                    <div className="flex-1 overflow-visible bg-white min-h-0">
                         {sortedExpenses.length === 0 ? (
                             <div className="flex-1 flex flex-col items-center justify-center p-8 text-gray-400 h-full">
                                 <Calendar className="w-12 h-12 mb-3 opacity-20" />
@@ -428,7 +428,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                             </button>
                         </div>
 
-                        <div className="p-6 overflow-y-auto flex-1 space-y-5">
+                        <div className="p-6 overflow-visible flex-1 space-y-5">
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5">Date</label>
                                 <input

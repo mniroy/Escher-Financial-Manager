@@ -274,7 +274,7 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
     }, [incomeData, selectedYear]);
 
     return (
-        <div className="flex flex-col h-full bg-gray-50 overflow-hidden relative">
+        <div className="flex flex-col flex-1 bg-gray-50 overflow-visible relative">
 
             {/* TOP SECTION: Summary Cards - Hide on mobile if editing */}
             <div className={`shrink-0 p-4 pb-0 md:p-6 md:pb-2 ${editingIncome ? 'hidden md:grid' : ''}`}>
@@ -402,11 +402,11 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
             </div>
 
             {/* Main Content Area: Split View for Editing */}
-            <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-visible">
 
                 {/* List Container - Hidden on mobile if editing */}
-                <div className={`flex flex-col flex-1 min-h-0 p-6 pt-2 overflow-hidden ${editingIncome ? 'hidden md:flex' : 'flex'}`}>
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 flex flex-col overflow-hidden">
+                <div className={`flex flex-col flex-1 min-h-0 p-6 pt-2 overflow-visible ${editingIncome ? 'hidden md:flex' : 'flex'}`}>
+                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 flex-1 flex flex-col overflow-visible">
 
                         {/* Header Controls (Tabs & Year) */}
                         <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50/50">
@@ -458,7 +458,7 @@ const IncomeManager: React.FC<Props> = ({ incomeData, onEditIncome, onDeleteInco
                         </div>
 
                         {/* Mobile List View */}
-                        <div className="md:hidden flex-1 overflow-y-auto">
+                        <div className="md:hidden flex-1 overflow-visible">
                             <div className="divide-y divide-gray-50">
                                 {processedData.map((monthData) => {
                                     const monthTotals = getMonthTotals(monthData.entries);

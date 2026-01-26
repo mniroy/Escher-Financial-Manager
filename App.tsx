@@ -371,7 +371,7 @@ export default function App() {
         />
       )}
       {activeTab === 'input' && (
-        <div className="flex-1 p-4 overflow-y-auto">
+        <div className="p-4">
           <ExpenseLogger
             onSave={handleExpenseSave}
             onUploadReceipt={async (base64Data, mimeType, fileName, expenseDate) => {
@@ -407,7 +407,7 @@ export default function App() {
       {activeTab === 'budget' && <BudgetTable budgetItems={budgetItems} onUpdateBudget={handleBudgetUpdate} incomeData={incomeData} />}
       {activeTab === 'income' && <IncomeManager incomeData={incomeData} onEditIncome={handleEditIncome} onDeleteIncome={handleDeleteIncome} />}
       {activeTab === 'income-input' && (
-        <div className="flex-1 p-4 md:p-8 overflow-y-auto">
+        <div className="p-4 md:p-8">
           <IncomeLogger onSave={handleIncomeSave} />
         </div>
       )}

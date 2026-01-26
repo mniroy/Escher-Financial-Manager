@@ -71,97 +71,90 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
     return true; // All scrollable containers are at the top
   };
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    // Only enable touch gestures on mobile / small screens
+  // Attach touch listeners with passive: true to avoid blocking scroll
+  useEffect(() => {
     if (window.innerWidth >= 768) return;
 
-    // Store start position for swipe detection
-    setSwipeStartX(e.touches[0].clientX);
-    setSwipeStartY(e.touches[0].clientY);
-    setIsSwiping(false);
+    const root = document.getElementById('app-shell-root');
+    if (!root) return;
 
-    // Pull to refresh logic
-    if (onRefresh && !isRefreshing && isScrolledToTop(e.target)) {
-      setStartY(e.touches[0].clientY);
-    } else {
-      setStartY(0);
-    }
-  };
+    const onTouchStart = (e: TouchEvent) => {
+      setSwipeStartX(e.touches[0].clientX);
+      setSwipeStartY(e.touches[0].clientY);
+      setIsSwiping(false);
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (window.innerWidth >= 768) return;
+      if (onRefresh && !isRefreshing && isScrolledToTop(e.target)) {
+        setStartY(e.touches[0].clientY);
+      } else {
+        setStartY(0);
+      }
+    };
 
-    const currentX = e.touches[0].clientX;
-    const currentY = e.touches[0].clientY;
-    const diffX = currentX - swipeStartX;
-    const diffY = currentY - swipeStartY;
+    const onTouchMove = (e: TouchEvent) => {
+      const currentX = e.touches[0].clientX;
+      const currentY = e.touches[0].clientY;
+      const diffX = currentX - swipeStartX;
+      const diffY = currentY - swipeStartY;
 
-    // Detect if this is a horizontal swipe (more horizontal than vertical)
-    if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
-      setIsSwiping(true);
-    }
+      // Detect if this is a horizontal swipe (more horizontal than vertical)
+      if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 10) {
+        setIsSwiping(true);
+      }
 
-    // Pull to refresh logic (only if not horizontal swiping)
-    if (!isSwiping && startY > 0 && !isRefreshing && onRefresh) {
-      const diff = currentY - startY;
+      // Pull to refresh logic (only if not horizontal swiping)
+      if (!isSwiping && startY > 0 && !isRefreshing && onRefresh) {
+        const diff = currentY - startY;
+        if (diff > 0) {
+          const newDistance = Math.min(diff * 0.4, 120);
+          setPullDistance(newDistance);
+        } else {
+          setPullDistance(0);
+        }
+      }
+    };
 
-      if (diff > 0) {
-        const newDistance = Math.min(diff * 0.4, 120);
-        setPullDistance(newDistance);
+    const onTouchEnd = async (e: TouchEvent) => {
+      const endX = e.changedTouches[0].clientX;
+      const diffX = endX - swipeStartX;
+      const minSwipeDistance = 50;
+
+      // Tab swipe disabled for now to ensure vertical scroll priority
+      /*
+      if (isSwiping && Math.abs(diffX) > minSwipeDistance) {
+        const currentIndex = tabs.indexOf(activeTab);
+        if (diffX < 0 && currentIndex < tabs.length - 1) setActiveTab(tabs[currentIndex + 1]);
+        else if (diffX > 0 && currentIndex > 0) setActiveTab(tabs[currentIndex - 1]);
+      }
+      */
+
+      if (pullDistance > 60 && startY > 0 && onRefresh) {
+        setIsRefreshing(true);
+        setPullDistance(60);
+        try {
+          await onRefresh();
+        } finally {
+          setTimeout(() => {
+            setIsRefreshing(false);
+            setPullDistance(0);
+            setStartY(0);
+          }, 500);
+        }
       } else {
         setPullDistance(0);
+        setStartY(0);
       }
-    }
-  };
+    };
 
-  const handleTouchEnd = async (e: React.TouchEvent) => {
-    if (window.innerWidth >= 768) return;
+    root.addEventListener('touchstart', onTouchStart, { passive: true });
+    root.addEventListener('touchmove', onTouchMove, { passive: true });
+    root.addEventListener('touchend', onTouchEnd, { passive: true });
 
-    const endX = e.changedTouches[0].clientX;
-    const diffX = endX - swipeStartX;
-    const minSwipeDistance = 50;
-
-    // Handle horizontal swipe for tab navigation
-    if (isSwiping && Math.abs(diffX) > minSwipeDistance) {
-      const currentIndex = tabs.indexOf(activeTab);
-
-      if (diffX < 0 && currentIndex < tabs.length - 1) {
-        setActiveTab(tabs[currentIndex + 1]);
-      } else if (diffX > 0 && currentIndex > 0) {
-        setActiveTab(tabs[currentIndex - 1]);
-      }
-    }
-
-    // Reset swipe state
-    setSwipeStartX(0);
-    setSwipeStartY(0);
-    setIsSwiping(false);
-
-    // Pull to refresh logic
-    if (!onRefresh) {
-      setPullDistance(0);
-      setStartY(0);
-      return;
-    }
-
-    // Trigger refresh if pulled far enough
-    if (pullDistance > 60 && startY > 0) {
-      setIsRefreshing(true);
-      setPullDistance(60);
-      try {
-        await onRefresh();
-      } finally {
-        setTimeout(() => {
-          setIsRefreshing(false);
-          setPullDistance(0);
-          setStartY(0);
-        }, 500);
-      }
-    } else {
-      setPullDistance(0);
-      setStartY(0);
-    }
-  };
+    return () => {
+      root.removeEventListener('touchstart', onTouchStart);
+      root.removeEventListener('touchmove', onTouchMove);
+      root.removeEventListener('touchend', onTouchEnd);
+    };
+  }, [onRefresh, isRefreshing, swipeStartX, swipeStartY, startY, pullDistance, isSwiping]);
 
   const NavItem = ({ id, icon: Icon, label }: { id: typeof activeTab, icon: any, label: string }) => (
     <button
@@ -179,10 +172,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
 
   return (
     <div
-      className="h-screen flex flex-col md:flex-row bg-gray-50 text-gray-900 overflow-hidden"
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+      id="app-shell-root"
+      className="w-full h-full flex flex-col md:flex-row bg-gray-50 text-gray-900 overflow-hidden"
     >
       {/* --- DESKTOP SIDEBAR --- */}
       <aside className="hidden md:flex flex-col w-72 bg-white border-r border-gray-200 h-full flex-shrink-0 z-20">
@@ -283,7 +274,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
       </header>
 
       {/* --- MAIN CONTENT --- */}
-      <div className="flex-1 flex flex-col min-w-0 relative">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 relative">
         {/* Pull Refresh Indicator (Mobile Only effectively) */}
         <div
           className="absolute top-4 left-0 w-full flex justify-center pointer-events-none z-40 transition-transform duration-200 ease-out md:hidden"
@@ -323,8 +314,8 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, onRe
         {/* Scrollable Area */}
         <main
           ref={contentRef}
-          // On mobile: pb-20 for bottom nav. On desktop: pb-0.
-          className="flex-1 w-full overflow-y-auto min-h-0 pb-20 md:pb-0 flex flex-col"
+          className="flex-1 w-full overflow-y-scroll min-h-0 pb-24 md:pb-0 flex flex-col touch-pan-y overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {children}
         </main>

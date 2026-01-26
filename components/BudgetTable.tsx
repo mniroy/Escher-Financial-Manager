@@ -305,7 +305,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, 
   };
 
   return (
-    <div className="h-full overflow-y-auto px-4 py-4">
+    <div className="flex-1 px-4 py-4">
       <div className="space-y-6 pb-20 md:pb-6 relative">
         {/* Top Summary Card */}
         <div className="bg-indigo-900 text-white rounded-xl p-6 shadow-md relative overflow-hidden shrink-0">

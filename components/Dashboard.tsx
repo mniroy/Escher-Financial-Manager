@@ -219,7 +219,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [expenses, yearlyBudgetItemNames, viewMode, displayedMonth, displayedYear]);
 
   return (
-    <div className="flex flex-col gap-4 p-4 h-full overflow-y-auto overscroll-none md:p-6 lg:max-w-full">
+    <div className="flex flex-col gap-4 p-4 flex-1 md:p-6 lg:max-w-full">
 
       {/* Grid Container for Desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
