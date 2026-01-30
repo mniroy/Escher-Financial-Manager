@@ -389,7 +389,7 @@ export const savePeriodModesToSheet = async (user: User, modes: import('../types
 
   // Write new data
   if (rows.length > 0) {
-    const writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/PeriodModes!A2?valueInputOption=USER_ENTERED`, {
+    let writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/PeriodModes!A2?valueInputOption=USER_ENTERED`, {
       method: 'PUT',
       headers: {
         Authorization: `Bearer ${user.accessToken}`,
@@ -404,7 +404,40 @@ export const savePeriodModesToSheet = async (user: User, modes: import('../types
 
     if (!writeResponse.ok) {
       if (writeResponse.status === 401) throw new Error("TOKEN_EXPIRED");
-      throw new Error('Failed to update period modes in Google Sheets');
+
+      // If failed (likely due to missing sheet), try treating it
+      if (writeResponse.status === 400) {
+        console.log("PeriodModes sheet missing, creating...");
+        try {
+          // 1. Create Sheet
+          await fetch(`${BASE_URL}/${user.spreadsheetId}:batchUpdate`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${user.accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests: [{ addSheet: { properties: { title: 'PeriodModes' } } }] })
+          });
+
+          // 2. Write Headers
+          await fetch(`${BASE_URL}/${user.spreadsheetId}/values/PeriodModes!A1:D1?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${user.accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ range: 'PeriodModes!A1:D1', majorDimension: 'ROWS', values: [['ID', 'Start Date', 'End Date', 'Target Plan']] })
+          });
+
+          // 3. Retry Write
+          writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/PeriodModes!A2?valueInputOption=USER_ENTERED`, {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${user.accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ range: 'PeriodModes!A2', majorDimension: 'ROWS', values: rows })
+          });
+        } catch (e) {
+          console.warn("Auto-creation of PeriodModes sheet failed", e);
+        }
+      }
+
+      if (!writeResponse.ok) {
+        const txt = await writeResponse.text();
+        throw new Error(`Failed to update period modes in Google Sheets: ${txt}`);
+      }
     }
   }
 
