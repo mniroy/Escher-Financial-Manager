@@ -2,8 +2,9 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Camera, Upload, Loader2, CheckCircle2, AlertCircle, X, CreditCard, Plane } from 'lucide-react';
 import { fileToGenerativePart, analyzeReceipt } from '../services/geminiService';
 import { getWahaConfig } from '../services/wahaService';
-import { BudgetCategory, Expense, BudgetLineItem } from '../types';
+import { BudgetCategory, Expense, BudgetLineItem, PeriodMode } from '../types';
 import { formatCurrency } from '../constants';
+import { getPeriodModes } from '../services/storageService';
 
 interface ExpenseLoggerProps {
     onSave: (expense: Expense) => Promise<void>;
@@ -35,6 +36,15 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const [pendingMode, setPendingMode] = useState<'standard' | 'yearly' | null>(null);
+    const periodModes = useMemo(() => getPeriodModes(), []);
+
+    // Helper to find matching period mode
+    const findMatchingPeriod = (dateStr: string): PeriodMode | undefined => {
+        if (!dateStr) return undefined;
+        return periodModes.find(mode => {
+            return dateStr >= mode.startDate && dateStr <= mode.endDate;
+        });
+    };
 
     // Effect to handle initialData (from WhatsApp bridge)
     useEffect(() => {
@@ -57,12 +67,22 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
         try {
             const { amount, merchant, date, category, base64Image, messageId, mimeType } = data;
 
-            // For WA, prioritize current UI context if set, else use AI suggestions
-            const plan = activeYearlyPlan || (appMode === 'yearly' && activePlan ? budgetItems.find(i => i.name === activePlan) : null);
+            const expenseDate = date || new Date().toISOString().split('T')[0];
+
+            // Period Mode Detection
+            const matchingPeriod = findMatchingPeriod(expenseDate);
+            let plan = activeYearlyPlan || (appMode === 'yearly' && activePlan ? budgetItems.find(i => i.name === activePlan) : null);
+
+            if (matchingPeriod) {
+                const periodPlan = budgetItems.find(i => i.name === matchingPeriod.budgetItemName);
+                if (periodPlan) {
+                    plan = periodPlan;
+                    onModeChange('yearly', periodPlan.name);
+                }
+            }
+
             const finalCategory = plan ? plan.category : (category as BudgetCategory);
             const finalPlanName = plan ? plan.name : undefined;
-
-            const expenseDate = date || new Date().toISOString().split('T')[0];
             const description = merchant || 'WhatsApp Receipt';
             const dateSlug = expenseDate.replace(/-/g, '');
             const descSlug = description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 30);
@@ -137,10 +157,21 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                 const base64Data = await fileToGenerativePart(file);
                 const result = await analyzeReceipt(base64Data, file.type);
 
+                const expenseDate = result.date || new Date().toISOString().split('T')[0];
+                const description = result.merchant || 'Receipt';
+
                 let finalCategory: BudgetCategory;
                 let finalPlanName: string | undefined;
 
-                if (loggingMode === 'yearly' && activePlan) {
+                // Period Mode Detection
+                const matchingPeriod = findMatchingPeriod(expenseDate);
+
+                if (matchingPeriod) {
+                    const plan = budgetItems.find(i => i.name === matchingPeriod.budgetItemName);
+                    finalCategory = plan ? plan.category : (result.category as BudgetCategory);
+                    finalPlanName = plan?.name;
+                    if (finalPlanName) onModeChange('yearly', finalPlanName);
+                } else if (loggingMode === 'yearly' && activePlan) {
                     const plan = budgetItems.find(i => i.name === activePlan);
                     finalCategory = plan ? plan.category : (result.category as BudgetCategory);
                     finalPlanName = plan?.name;
@@ -150,8 +181,6 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                     onModeChange('standard', '');
                 }
 
-                const expenseDate = result.date || new Date().toISOString().split('T')[0];
-                const description = result.merchant || 'Receipt';
                 const expenseId = `${expenseDate.replace(/-/g, '')}-${finalCategory.replace(/\s+/g, '')}-${description.toLowerCase().replace(/[^a-z0-9]+/g, '-').substring(0, 20)}`;
                 const fileName = `receipt-${expenseId}.${file.type.split('/')[1] || 'jpg'}`;
 

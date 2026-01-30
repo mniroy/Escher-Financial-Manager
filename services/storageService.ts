@@ -1,4 +1,4 @@
-import { Expense, User } from '../types';
+import { Expense, User, PeriodMode } from '../types';
 
 const STORAGE_KEY = 'budget_app_expenses';
 const USER_SESSION_KEY = 'escher_user_session';
@@ -87,6 +87,23 @@ export const getAppMode = (): { mode: 'standard' | 'yearly', planName: string } 
   try {
     return JSON.parse(stored);
   } catch {
-    return { mode: 'standard', planName: '' };
   }
+};
+
+// --- Period Mode Storage ---
+
+const PERIOD_MODES_KEY = 'escher_period_modes';
+
+export const getPeriodModes = (): PeriodMode[] => {
+  const stored = localStorage.getItem(PERIOD_MODES_KEY);
+  if (!stored) return [];
+  try {
+    return JSON.parse(stored);
+  } catch {
+    return [];
+  }
+};
+
+export const savePeriodModes = (modes: PeriodMode[]): void => {
+  localStorage.setItem(PERIOD_MODES_KEY, JSON.stringify(modes));
 };

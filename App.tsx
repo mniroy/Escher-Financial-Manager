@@ -411,7 +411,7 @@ export default function App() {
           <IncomeLogger onSave={handleIncomeSave} />
         </div>
       )}
-      {activeTab === 'settings' && <Settings />}
+      {activeTab === 'settings' && <Settings budgetItems={budgetItems} />}
     </Layout>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
 import { Expense, BudgetLineItem, User } from '../types';
+import { getPeriodModes } from '../services/storageService';
 import { Calendar, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart, ArrowUp, ArrowDown } from 'lucide-react';
 
 // Royalty-free landscape photos from Unsplash - direct CDN links for reliability
@@ -49,6 +50,21 @@ const Dashboard: React.FC<DashboardProps> = ({
       setSelectedAnnualPlan(yearlyItems[0].name);
     }
   }, [viewMode, yearlyItems, selectedAnnualPlan]);
+
+  // Auto-switch to Period Mode if today is within a configured range
+  const periodModes = useMemo(() => getPeriodModes(), []);
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    const match = periodModes.find(m => today >= m.startDate && today <= m.endDate);
+
+    if (match) {
+      const planExists = budgetItems.some(item => item.name === match.budgetItemName);
+      if (planExists) {
+        setViewMode('yearly-only');
+        setSelectedAnnualPlan(match.budgetItemName);
+      }
+    }
+  }, [periodModes, budgetItems]);
 
   const displayedMonth = selectedDate.getMonth();
   const displayedYear = selectedDate.getFullYear();
