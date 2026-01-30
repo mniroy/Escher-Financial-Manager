@@ -353,3 +353,83 @@ export const saveIncomeToSheet = async (user: User, incomeEntries: import('../ty
     }
   }
 };
+
+export const parsePeriodModesFromSheet = (values: any[][]): import('../types').PeriodMode[] => {
+  if (!values || values.length <= 1) return [];
+
+  return values.slice(1).map(row => ({
+    id: row[0],
+    startDate: row[1],
+    endDate: row[2],
+    budgetItemName: row[3]
+  }));
+};
+
+export const savePeriodModesToSheet = async (user: User, modes: import('../types').PeriodMode[]) => {
+  if (!user.spreadsheetId) throw new Error("No spreadsheet ID linked to user");
+
+  // Columns: ID, StartDate, EndDate, BudgetItemName
+  const rows = modes.map(mode => [
+    mode.id,
+    mode.startDate,
+    mode.endDate,
+    mode.budgetItemName
+  ]);
+
+  // First, get current row count to know if we need cleanup
+  let currentRowCount = 0;
+  try {
+    const currentData = await fetchSheetValues(user, 'PeriodModes!A2:A');
+    if (currentData.values && Array.isArray(currentData.values)) {
+      currentRowCount = currentData.values.length;
+    }
+  } catch (e) {
+    console.warn("Could not get current period mode count", e);
+  }
+
+  // Write new data
+  if (rows.length > 0) {
+    const writeResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/PeriodModes!A2?valueInputOption=USER_ENTERED`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${user.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: 'PeriodModes!A2',
+        majorDimension: 'ROWS',
+        values: rows
+      })
+    });
+
+    if (!writeResponse.ok) {
+      if (writeResponse.status === 401) throw new Error("TOKEN_EXPIRED");
+      throw new Error('Failed to update period modes in Google Sheets');
+    }
+  }
+
+  // Cleanup stale rows
+  if (currentRowCount > rows.length) {
+    const startClearRow = 2 + rows.length;
+    const endClearRow = 2 + currentRowCount - 1;
+    const rowsToClearCount = endClearRow - startClearRow + 1;
+    const emptyRows = Array(rowsToClearCount).fill(["", "", "", ""]); // Clear A-D
+
+    const clearResponse = await fetch(`${BASE_URL}/${user.spreadsheetId}/values/PeriodModes!A${startClearRow}?valueInputOption=USER_ENTERED`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${user.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        range: `PeriodModes!A${startClearRow}`,
+        majorDimension: 'ROWS',
+        values: emptyRows
+      })
+    });
+
+    if (!clearResponse.ok) {
+      console.warn('Failed to clean up stale period mode rows', await clearResponse.text());
+    }
+  }
+};

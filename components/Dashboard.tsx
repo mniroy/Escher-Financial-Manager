@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { calculateBudgetSummary, formatCurrency } from '../constants';
-import { Expense, BudgetLineItem, User } from '../types';
-import { getPeriodModes } from '../services/storageService';
+import { Expense, BudgetLineItem, User, PeriodMode } from '../types';
 import { Calendar, TrendingUp, ChevronLeft, ChevronRight, ChevronDown, Plane, Receipt, Wallet, CalendarDays, BarChart3, Tag, PieChart, ArrowUp, ArrowDown } from 'lucide-react';
 
 // Royalty-free landscape photos from Unsplash - direct CDN links for reliability
@@ -29,12 +28,14 @@ interface DashboardProps {
   expenses: Expense[];
   budgetItems: BudgetLineItem[];
   user: User;
+  periodModes?: PeriodMode[];
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
   expenses,
   budgetItems,
-  user
+  user,
+  periodModes = []
 }) => {
   const [viewMode, setViewMode] = useState<'monthly' | 'yearly-only' | 'yearly'>('monthly');
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -52,7 +53,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [viewMode, yearlyItems, selectedAnnualPlan]);
 
   // Auto-switch to Period Mode if today is within a configured range
-  const periodModes = useMemo(() => getPeriodModes(), []);
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
     const match = periodModes.find(m => today >= m.startDate && today <= m.endDate);

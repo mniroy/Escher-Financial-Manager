@@ -4,7 +4,7 @@ import { fileToGenerativePart, analyzeReceipt } from '../services/geminiService'
 import { getWahaConfig } from '../services/wahaService';
 import { BudgetCategory, Expense, BudgetLineItem, PeriodMode } from '../types';
 import { formatCurrency } from '../constants';
-import { getPeriodModes } from '../services/storageService';
+
 
 interface ExpenseLoggerProps {
     onSave: (expense: Expense) => Promise<void>;
@@ -14,6 +14,7 @@ interface ExpenseLoggerProps {
     activePlan: string;
     onModeChange: (mode: 'standard' | 'yearly', plan: string) => void;
     initialData?: any;
+    periodModes?: PeriodMode[];
 }
 
 interface LogTask {
@@ -30,13 +31,13 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
     appMode,
     activePlan,
     onModeChange,
-    initialData
+    initialData,
+    periodModes = []
 }) => {
     const [tasks, setTasks] = useState<LogTask[]>([]);
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const uploadInputRef = useRef<HTMLInputElement>(null);
     const [pendingMode, setPendingMode] = useState<'standard' | 'yearly' | null>(null);
-    const periodModes = useMemo(() => getPeriodModes(), []);
 
     // Helper to find matching period mode
     const findMatchingPeriod = (dateStr: string): PeriodMode | undefined => {

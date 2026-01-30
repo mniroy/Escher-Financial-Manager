@@ -2,18 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Save, MessageSquare, Shield, Globe, Info, Workflow, Copy, Bell, BellOff, ExternalLink, Calendar, Plus, Trash2, Clock } from 'lucide-react';
 import { getWahaConfig, saveWahaConfig } from '../services/wahaService';
 import { getSavedSubscription, subscribeToPush, isNotificationPermissionGranted, requestNotificationPermission } from '../services/pushNotificationService';
-import { getPeriodModes, savePeriodModes } from '../services/storageService';
 import { WahaConfig, BudgetLineItem, PeriodMode } from '../types';
 
 interface SettingsProps {
   budgetItems?: BudgetLineItem[];
+  periodModes?: PeriodMode[];
+  onUpdatePeriodModes?: (modes: PeriodMode[]) => void;
 }
 
-const Settings: React.FC<SettingsProps> = ({ budgetItems = [] }) => {
+const Settings: React.FC<SettingsProps> = ({ budgetItems = [], periodModes = [], onUpdatePeriodModes }) => {
   const [config, setConfig] = useState<WahaConfig>(getWahaConfig());
   const [isSaved, setIsSaved] = useState(false);
   const [hasPush, setHasPush] = useState(isNotificationPermissionGranted());
-  const [periodModes, setPeriodModes] = useState<PeriodMode[]>(getPeriodModes());
 
   // New Period Mode Form
   const [newModeStart, setNewModeStart] = useState('');
@@ -48,8 +48,7 @@ const Settings: React.FC<SettingsProps> = ({ budgetItems = [] }) => {
     };
 
     const updatedModes = [...periodModes, newMode];
-    setPeriodModes(updatedModes);
-    savePeriodModes(updatedModes);
+    onUpdatePeriodModes?.(updatedModes);
 
     // Reset form
     setNewModeStart('');
@@ -59,8 +58,7 @@ const Settings: React.FC<SettingsProps> = ({ budgetItems = [] }) => {
 
   const handleDeletePeriodMode = (id: string) => {
     const updatedModes = periodModes.filter(m => m.id !== id);
-    setPeriodModes(updatedModes);
-    savePeriodModes(updatedModes);
+    onUpdatePeriodModes?.(updatedModes);
   };
 
   const handleEnablePush = async () => {

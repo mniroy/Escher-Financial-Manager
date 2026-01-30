@@ -11,10 +11,10 @@ import Settings from './components/Settings';
 import IncomeLogger from './components/IncomeLogger';
 
 import { getExpenses, saveExpense as saveLocalExpense, saveUserSession, getUserSession, clearUserSession, getAppMode, saveAppMode } from './services/storageService';
-import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet, parseIncomeFromSheet, saveIncomeToSheet } from './services/googleSheetsService';
+import { fetchSheetValues, appendSheetRow, parseBudgetFromSheet, parseExpensesFromSheet, saveBudgetToSheet, saveExpensesToSheet, parseIncomeFromSheet, saveIncomeToSheet, parsePeriodModesFromSheet, savePeriodModesToSheet } from './services/googleSheetsService';
 import { uploadReceiptToDrive } from './services/driveService';
 import { isTokenExpired, silentRefreshToken } from './services/authService';
-import { Expense, BudgetLineItem, User, IncomeEntry } from './types';
+import { Expense, BudgetLineItem, User, IncomeEntry, PeriodMode } from './types';
 import { DEFAULT_BUDGET_ITEMS } from './constants';
 import { Loader2 } from 'lucide-react';
 
@@ -24,6 +24,7 @@ export default function App() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [budgetItems, setBudgetItems] = useState<BudgetLineItem[]>(DEFAULT_BUDGET_ITEMS);
   const [incomeData, setIncomeData] = useState<IncomeEntry[]>([]);
+  const [periodModes, setPeriodModes] = useState<PeriodMode[]>([]);
   const [loading, setLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -126,6 +127,17 @@ export default function App() {
       } catch (incomeError) {
         console.warn('Income sheet not found or empty', incomeError);
         setIncomeData([]);
+        setIncomeData([]);
+      }
+
+      // Sync Period Modes
+      try {
+        const periodData = await fetchSheetValues(currentUser, 'PeriodModes!A:D');
+        const parsedPeriods = parsePeriodModesFromSheet(periodData.values);
+        setPeriodModes(parsedPeriods);
+      } catch (periodError) {
+        console.warn('PeriodModes sheet not found or empty', periodError);
+        setPeriodModes([]);
       }
 
     } catch (error: any) {
@@ -321,6 +333,23 @@ export default function App() {
     }
   };
 
+  const handleUpdatePeriodModes = async (newModes: PeriodMode[]) => {
+    if (!user) return;
+    try {
+      setPeriodModes(newModes);
+      await savePeriodModesToSheet(user, newModes);
+    } catch (error: any) {
+      console.error("Period Modes Save Error", error);
+      if (error.message === 'TOKEN_EXPIRED') {
+        alert("Session expired. Please log in again.");
+        handleLogout();
+      } else {
+        alert("Failed to update period modes in Google Sheets.");
+        loadData(user);
+      }
+    }
+  };
+
   // Memoized refresh handler for TransactionList
   const handleRefresh = useCallback(async () => {
     if (user) {
@@ -368,6 +397,7 @@ export default function App() {
           expenses={expenses}
           budgetItems={budgetItems}
           user={user}
+          periodModes={periodModes}
         />
       )}
       {activeTab === 'input' && (
@@ -383,6 +413,7 @@ export default function App() {
             activePlan={activePlan}
             onModeChange={handleModeChange}
             initialData={waExpense}
+            periodModes={periodModes}
           />
         </div>
       )}
@@ -411,7 +442,7 @@ export default function App() {
           <IncomeLogger onSave={handleIncomeSave} />
         </div>
       )}
-      {activeTab === 'settings' && <Settings budgetItems={budgetItems} />}
+      {activeTab === 'settings' && <Settings budgetItems={budgetItems} periodModes={periodModes} onUpdatePeriodModes={handleUpdatePeriodModes} />}
     </Layout>
   );
 }
