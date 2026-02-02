@@ -2,11 +2,35 @@ import crypto from 'crypto';
 
 const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 
+async function fetchWithRetry(url: string, options: any, retries = 3): Promise<Response> {
+    let attempt = 0;
+    while (true) {
+        try {
+            const response = await fetch(url, options);
+            if (response.ok || (response.status !== 429 && response.status < 500)) {
+                return response;
+            }
+            if (attempt >= retries) return response;
+
+            const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+            console.warn(`[Google API] Retry ${attempt + 1}/${retries} for Status ${response.status} in ${Math.round(delay)}ms`);
+            await new Promise(r => setTimeout(r, delay));
+            attempt++;
+        } catch (error) {
+            if (attempt >= retries) throw error;
+            const delay = Math.pow(2, attempt) * 1000 + Math.random() * 500;
+            console.warn(`[Google API] Retry ${attempt + 1}/${retries} for Network Error in ${Math.round(delay)}ms`);
+            await new Promise(r => setTimeout(r, delay));
+            attempt++;
+        }
+    }
+}
+
 export async function refreshGoogleToken(refreshToken: string): Promise<string> {
     const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
     if (!CLIENT_SECRET) throw new Error("GOOGLE_CLIENT_SECRET missing on server");
 
-    const response = await fetch('https://oauth2.googleapis.com/token', {
+    const response = await fetchWithRetry('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
@@ -51,7 +75,7 @@ export async function getGoogleAccessToken(clientEmail: string, privateKey: stri
     const signature = sign.sign(privateKey.replace(/\\n/g, '\n'), 'base64url');
     const jwt = `${encodedHeader}.${encodedClaimSet}.${signature}`;
 
-    const response = await fetch('https://oauth2.googleapis.com/token', {
+    const response = await fetchWithRetry('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
@@ -70,7 +94,7 @@ export async function findOrCreateFolder(token: string, folderName: string, pare
     const query = `name = '${folderName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false${parentId ? ` and '${parentId}' in parents` : ''}`;
     const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=files(id)`;
 
-    const searchRes = await fetch(searchUrl, {
+    const searchRes = await fetchWithRetry(searchUrl, {
         headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -80,7 +104,7 @@ export async function findOrCreateFolder(token: string, folderName: string, pare
     }
 
     // Create
-    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    const createRes = await fetchWithRetry('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${token}`,
@@ -116,7 +140,7 @@ export async function uploadToDrive(token: string, folderId: string, base64: str
         base64 +
         closeDelimiter;
 
-    const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    const response = await fetchWithRetry('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${token}`,
@@ -133,7 +157,7 @@ export async function uploadToDrive(token: string, folderId: string, base64: str
     const fileId = data.id;
 
     // Set permissions
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+    await fetchWithRetry(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${token}`,
@@ -147,7 +171,7 @@ export async function uploadToDrive(token: string, folderId: string, base64: str
 
 export async function appendToSheet(token: string, spreadsheetId: string, range: string, values: any[]) {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
-    const response = await fetch(url, {
+    const response = await fetchWithRetry(url, {
         method: 'POST',
         headers: {
             Authorization: `Bearer ${token}`,
@@ -159,4 +183,23 @@ export async function appendToSheet(token: string, spreadsheetId: string, range:
     if (!response.ok) {
         throw new Error(`Sheet Append Error: ${await response.text()}`);
     }
+}
+
+export async function getSheetValues(token: string, spreadsheetId: string, range: string): Promise<any[][]> {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}`;
+    const response = await fetchWithRetry(url, {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        // If the sheet doesn't exist or range is invalid, we might want to return empty or throw
+        // For PeriodModes, if it doesn't exist, we just assume no periods.
+        if (response.status === 400 || response.status === 404) return [];
+        throw new Error(`Sheet Read Error: ${await response.text()}`);
+    }
+
+    const data = await response.json();
+    return data.values || [];
 }

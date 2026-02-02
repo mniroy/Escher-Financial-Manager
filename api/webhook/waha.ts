@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { analyzeReceipt, analyzeIncome } from '../_lib/analysis.js';
-import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet } from '../_lib/google.js';
+import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet, getSheetValues } from '../_lib/google.js';
 import { IncomeEntry } from '../../types';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -164,11 +164,31 @@ ${logStatus}`;
                     const fileName = `receipt-${analysis.date}-${analysis.merchant.toLowerCase().replace(/[^a-z0-9]/g, '-')}.jpg`;
                     const receiptUrl = await uploadToDrive(googleToken, monthId, base64Image, fileName, mimeType!);
 
+                    // Check for active Period Modes
+                    let appliedPeriod = '';
+                    try {
+                        const periods = await getSheetValues(googleToken, userConfig.sid!, 'PeriodModes!A2:D');
+                        const txDate = new Date(analysis.date);
+                        for (const row of periods) {
+                            // Row: [0:ID, 1:StartDate, 2:EndDate, 3:TargetPlan]
+                            if (row.length >= 4) {
+                                const startDate = new Date(row[1]);
+                                const endDate = new Date(row[2]);
+                                if (txDate >= startDate && txDate <= endDate) {
+                                    appliedPeriod = row[3]; // Target Plan Name
+                                    break;
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('[WAHA Webhook] Failed to fetch periods:', e);
+                    }
+
                     const id = `${analysis.date.replace(/-/g, '')}-${analysis.category.replace(/\s+/g, '')}-${analysis.merchant.toLowerCase().substring(0, 10)}`;
                     await appendToSheet(googleToken, userConfig.sid, 'Expenses!A2', [
-                        id, analysis.date, analysis.category, analysis.merchant, analysis.amount, receiptUrl, ''
+                        id, analysis.date, analysis.category, analysis.merchant, analysis.amount, receiptUrl, appliedPeriod
                     ]);
-                    logStatus = '✅ Logged to Expenses & Drive';
+                    logStatus = '✅ Logged to Expenses & Drive' + (appliedPeriod ? ` (Period: ${appliedPeriod})` : '');
                 } catch (err: any) {
                     console.error('[WAHA Webhook] Receipt Logging Error:', err);
                     logStatus = `⚠️ Logging Failed: ${err.message}`;
