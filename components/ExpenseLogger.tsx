@@ -68,7 +68,7 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
         try {
             const { amount, merchant, date, category, base64Image, messageId, mimeType } = data;
 
-            const expenseDate = date || new Date().toISOString().split('T')[0];
+            const expenseDate = date ? new Date(date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
             // Period Mode Detection
             const matchingPeriod = findMatchingPeriod(expenseDate);

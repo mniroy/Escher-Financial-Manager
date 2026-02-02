@@ -26,6 +26,7 @@ export default function App() {
   const [incomeData, setIncomeData] = useState<IncomeEntry[]>([]);
   const [periodModes, setPeriodModes] = useState<PeriodMode[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dataSynced, setDataSynced] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Global App Mode State (Persistent)
@@ -103,6 +104,7 @@ export default function App() {
     setBudgetItems(DEFAULT_BUDGET_ITEMS);
     setAppMode('standard');
     setActivePlan('');
+    setDataSynced(false);
   };
 
   const loadData = useCallback(async (currentUser: User) => {
@@ -148,6 +150,7 @@ export default function App() {
       }
     } finally {
       setLoading(false);
+      setDataSynced(true);
     }
   }, []);
 
@@ -412,7 +415,7 @@ export default function App() {
             appMode={appMode}
             activePlan={activePlan}
             onModeChange={handleModeChange}
-            initialData={waExpense}
+            initialData={dataSynced ? waExpense : null}
             periodModes={periodModes}
           />
         </div>
