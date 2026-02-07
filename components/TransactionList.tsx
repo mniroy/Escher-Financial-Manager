@@ -187,6 +187,11 @@ const TransactionList: React.FC<TransactionListProps> = ({
         if (window.confirm('Delete this transaction?')) {
             try {
                 await onDeleteExpense(expenseId);
+                // Close modal if we are deleting the currently edited expense
+                if (isModalOpen && editingExpense?.id === expenseId) {
+                    setIsModalOpen(false);
+                    setEditingExpense(null);
+                }
             } catch (error) {
                 console.error('Failed to delete expense:', error);
                 alert('Failed to delete expense. Please try again.');
@@ -625,7 +630,7 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                     )}
                                 </div>
 
-                                <div className="pt-2">
+                                <div className="pt-2 flex flex-col gap-3">
                                     <button
                                         onClick={handleSaveEdit}
                                         disabled={isRefreshing}
@@ -637,6 +642,15 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                             <Save className="w-4 h-4" />
                                         )}
                                         {isRefreshing ? 'Saving...' : 'Save Changes'}
+                                    </button>
+
+                                    <button
+                                        onClick={() => handleDelete(editingExpense.id)}
+                                        disabled={isRefreshing}
+                                        className="w-full bg-red-50 text-red-600 py-3 px-4 rounded-xl font-bold hover:bg-red-100 flex items-center justify-center gap-2 text-sm transition-all active:scale-[0.98] disabled:opacity-50"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                        Delete Transaction
                                     </button>
                                 </div>
                             </div>
