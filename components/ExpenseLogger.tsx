@@ -156,7 +156,10 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
 
             try {
                 const base64Data = await fileToGenerativePart(file);
-                const result = await analyzeReceipt(base64Data, file.type);
+
+                // Extract custom categories from budgetItems
+                const customCategories = Array.from(new Set(budgetItems.map(i => i.category)));
+                const result = await analyzeReceipt(base64Data, file.type, customCategories);
 
                 const expenseDate = result.date || new Date().toISOString().split('T')[0];
                 const description = result.merchant || 'Receipt';

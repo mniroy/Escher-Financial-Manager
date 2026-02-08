@@ -16,14 +16,20 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
   });
 };
 
-export const analyzeReceipt = async (base64Image: string, mimeType: string): Promise<AnalysisResult> => {
+export const analyzeReceipt = async (base64Image: string, mimeType: string, customCategories: string[] = []): Promise<AnalysisResult> => {
   if (!process.env.API_KEY) {
     throw new Error("API Key not found in environment variables");
   }
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const categoriesList = Object.values(BudgetCategory).join(', ');
+  // Merge default categories with custom ones and remove duplicates
+  const allCategories = Array.from(new Set([
+    ...Object.values(BudgetCategory),
+    ...customCategories
+  ])).sort();
+
+  const categoriesList = allCategories.join(', ');
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
@@ -47,11 +53,7 @@ CRITICAL - AMOUNT EXTRACTION:
 - The amount should typically be in thousands or hundreds of thousands
 
 CATEGORY - Use EXACTLY one of: [${categoriesList}]
-- Food = restaurants, cafes, food delivery
-- Grocery = supermarkets, grocery stores  
-- Shopping = retail, e-commerce (Shopee, Tokopedia, etc.), general purchases
-- Transportation = taxi, Grab, Gojek rides, gas, tolls
-- Bill = utilities, subscriptions, services
+- Match the item to the best fitting category from the list above.
 - If unsure, use "Other"
 
 DATE: Return in YYYY-MM-DD format. Look for order date or transaction date.
@@ -73,8 +75,8 @@ MERCHANT: Extract the store/seller name.`
           date: { type: Type.STRING, description: "Date of purchase in YYYY-MM-DD format" },
           category: {
             type: Type.STRING,
-            enum: Object.values(BudgetCategory),
-            description: "Must be one of the exact budget categories"
+            enum: allCategories,
+            description: "Must be one of the provided budget categories"
           }
         },
         required: ["amount", "merchant", "category"]

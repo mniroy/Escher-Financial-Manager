@@ -149,11 +149,33 @@ ${logStatus}`;
 
         } else if (isReceiptSender && base64Image) {
             console.log('[WAHA Webhook] Processing Receipt:', messageId);
-            const analysis = await analyzeReceipt(base64Image, mimeType!, geminiKey!);
+
+            let customCategories: string[] = [];
+            let googleToken: any = null;
+
+            // Pre-fetch categories if we have user config
+            if (userConfig.rt && userConfig.sid) {
+                try {
+                    googleToken = await refreshGoogleToken(userConfig.rt);
+                    const budgetData = await getSheetValues(googleToken, userConfig.sid, 'Budget!A2:A');
+                    // Extract non-empty categories
+                    const cats = new Set<string>();
+                    budgetData.forEach((row: any[]) => {
+                        if (row[0]) cats.add(row[0]);
+                    });
+                    customCategories = Array.from(cats);
+                } catch (e) {
+                    console.warn('[WAHA Webhook] Failed to fetch custom categories:', e);
+                }
+            }
+
+            const analysis = await analyzeReceipt(base64Image, mimeType!, geminiKey!, customCategories);
 
             if (userConfig.rt && userConfig.sid) {
                 try {
-                    const googleToken = await refreshGoogleToken(userConfig.rt);
+                    if (!googleToken) {
+                        googleToken = await refreshGoogleToken(userConfig.rt);
+                    }
                     const dateParts = (analysis.date || new Date().toISOString().split('T')[0]).split('-');
                     const rootId = await findOrCreateFolder(googleToken, 'Escher Finance Manager');
                     const yearId = await findOrCreateFolder(googleToken, dateParts[0], rootId);

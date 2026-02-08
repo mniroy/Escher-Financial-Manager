@@ -25,9 +25,12 @@ function cleanBase64(base64: string): string {
         .trim();
 }
 
-export async function analyzeReceipt(base64Image: string, mimeType: string, apiKey: string): Promise<AnalysisResult> {
+export async function analyzeReceipt(base64Image: string, mimeType: string, apiKey: string, customCategories: string[] = []): Promise<AnalysisResult> {
     const cleanData = cleanBase64(base64Image);
     const currentDate = new Date().toISOString().split('T')[0];
+
+    // Combine default and custom categories
+    const allCategories = Array.from(new Set([...BUDGET_CATEGORIES, ...customCategories]));
 
     const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
         method: 'POST',
@@ -45,7 +48,7 @@ CONTEXT:
 - CURRENCY CONVERSION: If the receipt is NOT in IDR (Indonesian Rupiah), you MUST convert the total amount to IDR using the latest known exchange rate.
 - RESULT: The "amount" field MUST be in IDR (integer).
 - CRITICAL: Indonesian Rupiah - dots are THOUSAND separators (Rp134.100 = 134100).
-- Categories: ${BUDGET_CATEGORIES.join(', ')}.
+- Categories: ${allCategories.join(', ')}.
 
 Return JSON: {"amount": number, "merchant": string, "date": "YYYY-MM-DD", "category": string}`
                     }
@@ -59,7 +62,7 @@ Return JSON: {"amount": number, "merchant": string, "date": "YYYY-MM-DD", "categ
     const result = JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
 
     // Normalize category
-    if (!BUDGET_CATEGORIES.includes(result.category)) {
+    if (!allCategories.includes(result.category)) {
         result.category = 'Other';
     }
 
