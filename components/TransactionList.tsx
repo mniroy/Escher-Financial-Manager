@@ -549,10 +549,14 @@ const TransactionList: React.FC<TransactionListProps> = ({
                                     <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Category</label>
                                     <select
                                         value={editingExpense.category}
-                                        onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value as BudgetCategory })}
+                                        onChange={(e) => setEditingExpense({ ...editingExpense, category: e.target.value })}
                                         className="w-full rounded-xl border-gray-200 bg-gray-50/50 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2 px-3 bg-white text-xs font-semibold"
                                     >
-                                        {Object.values(BudgetCategory).map(cat => (
+                                        {Array.from(new Set([
+                                            ...Object.values(BudgetCategory),
+                                            ...expenses.map(e => e.category),
+                                            ...budgetItems.map(i => i.category)
+                                        ])).sort().map(cat => (
                                             <option key={cat} value={cat}>{cat}</option>
                                         ))}
                                     </select>

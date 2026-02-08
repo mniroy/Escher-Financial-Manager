@@ -19,9 +19,14 @@ export const DEFAULT_BUDGET_ITEMS: BudgetLineItem[] = [
 ];
 
 export const calculateBudgetSummary = (items: BudgetLineItem[]): BudgetRow[] => {
-  return Object.values(BudgetCategory).map(cat => {
+  // Get all unique categories from items and default categories
+  const defaultCategories = Object.values(BudgetCategory) as string[];
+  const itemCategories = items.map(i => i.category);
+  const allCategories = Array.from(new Set([...defaultCategories, ...itemCategories]));
+
+  return allCategories.map(cat => {
     const catItems = items.filter(item => item.category === cat);
-    
+
     const monthlyAllocation = catItems
       .filter(item => item.frequency === 'Monthly')
       .reduce((sum, item) => sum + item.amount, 0);
@@ -39,7 +44,7 @@ export const calculateBudgetSummary = (items: BudgetLineItem[]): BudgetRow[] => 
 };
 
 export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('id-ID', { 
+  return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,

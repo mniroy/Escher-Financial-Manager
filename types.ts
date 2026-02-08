@@ -15,14 +15,14 @@ export enum BudgetCategory {
 }
 
 export interface BudgetLineItem {
-  category: BudgetCategory;
+  category: string;
   name: string;
   amount: number;
   frequency: 'Monthly' | 'Yearly';
 }
 
 export interface BudgetRow {
-  category: BudgetCategory;
+  category: string;
   monthlyAllocation: number;
   yearlyAllocation: number;
 }
@@ -30,7 +30,7 @@ export interface BudgetRow {
 export interface Expense {
   id: string;
   date: string; // ISO Date string
-  category: BudgetCategory;
+  category: string;
   amount: number;
   description: string;
   receiptUrl?: string;

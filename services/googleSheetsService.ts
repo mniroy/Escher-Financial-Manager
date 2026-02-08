@@ -61,12 +61,11 @@ export const saveBudgetToSheet = async (user: User, budgetItems: BudgetLineItem[
   try {
     const currentData = await fetchSheetValues(user, 'Budget!A2:A'); // Only need column A to check categories
     if (currentData.values && Array.isArray(currentData.values)) {
-      const validCategories = new Set(Object.values(BudgetCategory));
-
       for (const row of currentData.values) {
         const cellValue = row[0];
-        // If cell is empty or NOT a valid category, we assume end of table.
-        if (!cellValue || !validCategories.has(cellValue)) {
+        // If cell is empty, we assume end of table.
+        // We removed the strict BudgetCategory check to support custom categories.
+        if (!cellValue) {
           break;
         }
         tableRowCount++;

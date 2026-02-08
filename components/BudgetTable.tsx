@@ -14,6 +14,13 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [viewportHeight, setViewportHeight] = useState<string>('100%');
+  const [isCustomCategoryMode, setIsCustomCategoryMode] = useState(false);
+
+  const distinctCategories = useMemo(() => {
+    const defaults = Object.values(BudgetCategory) as string[];
+    const current = budgetItems.map(item => item.category);
+    return Array.from(new Set([...defaults, ...current])).sort();
+  }, [budgetItems]);
 
   const [formData, setFormData] = useState<BudgetLineItem>({
     category: BudgetCategory.Food,
@@ -71,6 +78,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, 
         frequency: 'Monthly'
       });
     }
+    setIsCustomCategoryMode(false);
     setIsModalOpen(true);
   };
 
@@ -153,7 +161,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, 
       grouped[item.category].push(item);
     });
 
-    const categories = Object.keys(grouped) as BudgetCategory[];
+    const categories = Object.keys(grouped).sort();
     const sectionTotal = items.reduce((sum, i) => sum + i.amount, 0);
     const colSpanCount = type === 'monthly' ? (isEditMode ? 4 : 3) : (isEditMode ? 3 : 2);
 
@@ -444,15 +452,46 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ budgetItems, onUpdateBudget, 
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value as BudgetCategory }))}
-                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
-                  >
-                    {Object.values(BudgetCategory).map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                  {isCustomCategoryMode ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={formData.category}
+                        onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                        placeholder="Enter new category name"
+                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => {
+                          setIsCustomCategoryMode(false);
+                          setFormData(prev => ({ ...prev, category: BudgetCategory.Food }));
+                        }}
+                        className="px-3 py-2 text-gray-500 hover:bg-gray-100 rounded-lg border border-gray-300"
+                        title="Cancel custom category"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.category}
+                      onChange={(e) => {
+                        if (e.target.value === '__NEW__') {
+                          setIsCustomCategoryMode(true);
+                          setFormData(prev => ({ ...prev, category: '' }));
+                        } else {
+                          setFormData(prev => ({ ...prev, category: e.target.value }));
+                        }
+                      }}
+                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 py-2.5 border px-3 bg-white"
+                    >
+                      {distinctCategories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      <option value="__NEW__" className="font-bold text-indigo-600">+ Create New Category...</option>
+                    </select>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
