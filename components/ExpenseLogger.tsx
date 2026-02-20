@@ -66,7 +66,7 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
         setTasks(prev => [{ id: taskId, status: 'processing', message: 'Logging WhatsApp receipt...' }, ...prev]);
 
         try {
-            const { amount, merchant, date, category, base64Image, messageId, mimeType } = data;
+            const { amount, merchant, date, category, base64Image, messageId, mimeType, chatId } = data;
 
             const expenseDate = date ? new Date(date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
 
@@ -94,16 +94,34 @@ const ExpenseLogger: React.FC<ExpenseLoggerProps> = ({
                 const waha = getWahaConfig();
                 if (waha.apiUrl) {
                     try {
-                        const wUrl = `${waha.apiUrl}/api/${waha.session || 'default'}/messages/${messageId}/download`;
-                        const res = await fetch(wUrl);
+                        let wUrl: string;
+                        let headers: any = {};
+
+                        if (waha.engine === 'gowa') {
+                            wUrl = `${waha.apiUrl}/message/${messageId}/download?phone=${encodeURIComponent(chatId)}`;
+                            if (waha.gowaUsername && waha.gowaPassword) {
+                                const auth = btoa(`${waha.gowaUsername}:${waha.gowaPassword}`);
+                                headers['Authorization'] = `Basic ${auth}`;
+                            }
+                            headers['X-Device-Id'] = waha.session || '1';
+                        } else {
+                            wUrl = `${waha.apiUrl}/api/${waha.session || 'default'}/messages/${messageId}/download`;
+                        }
+
+                        const res = await fetch(wUrl, { headers });
                         if (res.ok) {
-                            const buffer = await res.arrayBuffer();
-                            const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
-                            const reader = new FileReader();
-                            finalBase64 = await new Promise((resolve) => {
-                                reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-                                reader.readAsDataURL(blob);
-                            });
+                            if (waha.engine === 'gowa') {
+                                const gowaData = await res.json();
+                                finalBase64 = gowaData.data;
+                            } else {
+                                const buffer = await res.arrayBuffer();
+                                const blob = new Blob([buffer], { type: mimeType || 'image/jpeg' });
+                                const reader = new FileReader();
+                                finalBase64 = await new Promise((resolve) => {
+                                    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+                                    reader.readAsDataURL(blob);
+                                });
+                            }
                         }
                     } catch (e) { console.error(e); }
                 }

@@ -3,9 +3,14 @@ import { WahaConfig } from '../types';
 const WAHA_CONFIG_KEY = 'escher_waha_config';
 
 const DEFAULT_CONFIG: WahaConfig = {
+    engine: 'waha',
     apiUrl: '', // Configure via environment or user settings
     session: 'default',
-    allowedIds: ''
+    allowedIds: '',
+    allowedReceiptSenders: '',
+    allowedIncomeSenders: '',
+    gowaUsername: '',
+    gowaPassword: ''
 };
 
 export const getWahaConfig = (): WahaConfig => {

@@ -1,16 +1,78 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    const wahaUrl = process.env.WAHA_API_URL?.replace(/\/$/, '');
-    const wahaKey = process.env.WAHA_API_KEY;
-    const session = process.env.WAHA_SESSION || 'default';
+    // Get user-specific config from query (refresh token, spreadsheet ID, engine)
+    let userConfig: { rt?: string; sid?: string; eng?: 'waha' | 'gowa'; apiUrl?: string; session?: string; gowaUsername?: string; gowaPassword?: string } = {};
+    const configRaw = req.query.c as string;
+    if (configRaw) {
+        try {
+            userConfig = JSON.parse(Buffer.from(configRaw, 'base64').toString());
+        } catch (e) {
+            console.warn('[Status Webhook] Could not decode user config');
+        }
+    }
 
-    if (!wahaUrl) {
+    const engine = userConfig.eng || 'waha';
+    const apiUrl = (userConfig.apiUrl || (engine === 'waha' ? process.env.WAHA_API_URL : process.env.GOWA_API_URL))?.replace(/\/$/, '');
+    const wahaKey = process.env.WAHA_API_KEY;
+    const session = userConfig.session || (engine === 'waha' ? (process.env.WAHA_SESSION || 'default') : '1');
+
+    if (!apiUrl) {
         return res.status(200).json({
             status: 'unconfigured',
-            message: 'WAHA_API_URL not set'
+            message: `${engine.toUpperCase()}_API_URL not set`
         });
     }
+
+    if (engine === 'gowa') {
+        try {
+            const auth = userConfig.gowaUsername && userConfig.gowaPassword
+                ? Buffer.from(`${userConfig.gowaUsername}:${userConfig.gowaPassword}`).toString('base64')
+                : Buffer.from(`${process.env.GOWA_USERNAME || ''}:${process.env.GOWA_PASSWORD || ''}`).toString('base64');
+
+            const response = await fetch(`${apiUrl}/app/status`, {
+                headers: {
+                    'Authorization': `Basic ${auth}`,
+                    'X-Device-Id': session
+                }
+            });
+
+            if (!response.ok) {
+                return res.status(200).json({
+                    status: 'error',
+                    message: `GoWA returned ${response.status}`
+                });
+            }
+
+            const data = await response.json();
+            // GoWA status usually returns { is_connected: true, is_logged_in: true } if healthy
+            if (data.is_connected && data.is_logged_in) {
+                return res.status(200).json({
+                    status: 'WORKING',
+                    message: 'Healthy: GoWA Connected and Logged In'
+                });
+            } else if (!data.is_logged_in) {
+                return res.status(200).json({
+                    status: 'SCAN_QR_CODE',
+                    message: 'GoWA: QR Code Needed or Session Expired'
+                });
+            } else {
+                return res.status(200).json({
+                    status: 'disconnected',
+                    message: 'GoWA: Disconnected'
+                });
+            }
+        } catch (error: any) {
+            return res.status(200).json({
+                status: 'offline',
+                message: `GoWA Offline: ${error.message}`
+            });
+        }
+    }
+
+    // Default WAHA logic follows...
+    const wahaUrl = apiUrl;
+
 
     try {
         // Check session status

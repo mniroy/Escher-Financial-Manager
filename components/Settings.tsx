@@ -75,7 +75,10 @@ const Settings: React.FC<SettingsProps> = ({ budgetItems = [], periodModes = [],
 
     const configData: any = {
       rt: user.refreshToken,
-      sid: user.spreadsheetId
+      sid: user.spreadsheetId,
+      eng: config.engine || 'waha',
+      ars: config.allowedReceiptSenders,
+      ais: config.allowedIncomeSenders
     };
 
     const encoded = btoa(JSON.stringify(configData));
@@ -195,10 +198,117 @@ const Settings: React.FC<SettingsProps> = ({ budgetItems = [], periodModes = [],
         <div className="bg-white rounded-3xl shadow-xl shadow-gray-200/50 border border-gray-100 overflow-hidden">
           <div className="p-6 md:p-8 space-y-6">
             <div className="space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <h4 className="font-bold text-gray-900">WhatsApp Engine Settings</h4>
+                <button
+                  onClick={handleSaveWaha}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${isSaved
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
+                    }`}
+                >
+                  <Save className="w-4 h-4" />
+                  {isSaved ? 'Saved!' : 'Save Config'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">WhatsApp Engine</label>
+                  <select
+                    value={config.engine || 'waha'}
+                    onChange={(e) => setConfig({ ...config, engine: e.target.value as 'waha' | 'gowa' })}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm transition-all focus:border-amber-500 focus:ring-amber-500"
+                  >
+                    <option value="waha">WAHA (Default)</option>
+                    <option value="gowa">GoWA</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">API URL (Optional if set in .env)</label>
+                  <input
+                    type="text"
+                    value={config.apiUrl || ''}
+                    onChange={(e) => setConfig({ ...config, apiUrl: e.target.value })}
+                    placeholder={config.engine === 'gowa' ? 'http://localhost:3000' : 'http://waha:3000'}
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm transition-all focus:border-amber-500 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                  {config.engine === 'gowa' ? 'Device ID (e.g. 1)' : 'Session Name (e.g. default)'}
+                </label>
+                <input
+                  type="text"
+                  value={config.session || ''}
+                  onChange={(e) => setConfig({ ...config, session: e.target.value })}
+                  placeholder="default"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm transition-all focus:border-amber-500 focus:ring-amber-500"
+                />
+              </div>
+
+              {config.engine === 'gowa' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Username (Optional)</label>
+                    <input
+                      type="text"
+                      value={config.gowaUsername || ''}
+                      onChange={(e) => setConfig({ ...config, gowaUsername: e.target.value })}
+                      placeholder=""
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm transition-all focus:border-amber-500 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Password (Optional)</label>
+                    <input
+                      type="password"
+                      value={config.gowaPassword || ''}
+                      onChange={(e) => setConfig({ ...config, gowaPassword: e.target.value })}
+                      placeholder=""
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm transition-all focus:border-amber-500 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-4 space-y-4 border-t border-gray-50">
+                <h5 className="text-[10px] font-black text-indigo-500 uppercase tracking-widest px-1">Sender Filtering (Security)</h5>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Allowed Receipt Senders</label>
+                    <input
+                      type="text"
+                      value={config.allowedReceiptSenders || ''}
+                      onChange={(e) => setConfig({ ...config, allowedReceiptSenders: e.target.value })}
+                      placeholder="phone@s.whatsapp.net, group@g.us"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm transition-all focus:border-amber-500 focus:ring-amber-500"
+                    />
+                    <p className="text-[9px] text-gray-400 ml-1">Process photos from these IDs (comma separated)</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Allowed Income Senders</label>
+                    <input
+                      type="text"
+                      value={config.allowedIncomeSenders || ''}
+                      onChange={(e) => setConfig({ ...config, allowedIncomeSenders: e.target.value })}
+                      placeholder="phone@s.whatsapp.net"
+                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold shadow-sm transition-all focus:border-amber-500 focus:ring-amber-500"
+                    />
+                    <p className="text-[9px] text-gray-400 ml-1">Process text income logs from these IDs</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-gray-100">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-bold text-gray-900">Bridge Webhook URL</h4>
-                  <p className="text-xs text-gray-500 font-medium">Use this URL in your WAHA / automation tool</p>
+                  <p className="text-xs text-gray-500 font-medium">Use this URL in your {config.engine?.toUpperCase() || 'WAHA'} webhook settings</p>
                 </div>
                 <button
                   onClick={() => {

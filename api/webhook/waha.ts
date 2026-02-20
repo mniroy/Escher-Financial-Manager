@@ -11,19 +11,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Get config from environment variables
-    const wahaUrl = process.env.WAHA_API_URL?.replace(/\/$/, '');
-    const wahaKey = process.env.WAHA_API_KEY;
-    const session = process.env.WAHA_SESSION || 'default';
-    const allowedReceiptSenders = (process.env.WAHA_ALLOWED_SENDERS_RECEIPT || process.env.WAHA_ALLOWED_SENDERS || '').split(',').map(id => id.trim()).filter(Boolean);
-    const allowedIncomeSenders = (process.env.WAHA_ALLOWED_SENDERS_INCOME || '').split(',').map(id => id.trim()).filter(Boolean);
+    const envWahaUrl = process.env.WAHA_API_URL?.replace(/\/$/, '');
+    const envWahaKey = process.env.WAHA_API_KEY;
+    const envWahaSession = process.env.WAHA_SESSION || 'default';
 
-    if (!wahaUrl) {
-        console.error('[WAHA Webhook] Missing WAHA_API_URL env');
-        return res.status(500).json({ error: 'Server misconfigured' });
-    }
-
-    // Get user-specific config from query (refresh token, spreadsheet ID)
-    let userConfig: { rt?: string; sid?: string } = {};
+    // Get user-specific config from query (refresh token, spreadsheet ID, engine, etc)
+    let userConfig: { rt?: string; sid?: string; eng?: 'waha' | 'gowa'; apiUrl?: string; session?: string; gowaUsername?: string; gowaPassword?: string; ars?: string; ais?: string } = {};
     const configRaw = req.query.c as string;
     if (configRaw) {
         try {
@@ -33,9 +26,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
     }
 
+    const allowedReceiptSenders = (userConfig.ars || process.env.WAHA_ALLOWED_SENDERS_RECEIPT || process.env.WAHA_ALLOWED_SENDERS || '').split(',').map(id => id.trim()).filter(Boolean);
+    const allowedIncomeSenders = (userConfig.ais || process.env.WAHA_ALLOWED_SENDERS_INCOME || '').split(',').map(id => id.trim()).filter(Boolean);
+
+    const engine = userConfig.eng || 'waha';
+    const baseUrl = (userConfig.apiUrl || (engine === 'waha' ? envWahaUrl : process.env.GOWA_API_URL))?.replace(/\/$/, '');
+    const wahaKey = envWahaKey;
+    const session = userConfig.session || (engine === 'waha' ? envWahaSession : '1');
+    const auth = engine === 'gowa'
+        ? (userConfig.gowaUsername && userConfig.gowaPassword
+            ? Buffer.from(`${userConfig.gowaUsername}:${userConfig.gowaPassword}`).toString('base64')
+            : Buffer.from(`${process.env.GOWA_USERNAME || ''}:${process.env.GOWA_PASSWORD || ''}`).toString('base64'))
+        : '';
+
+    if (!baseUrl) {
+        console.error('[WAHA Webhook] Missing API URL');
+        return res.status(500).json({ error: 'Server misconfigured' });
+    }
+
     const body = req.body;
     const eventName = body.event;
 
+    // GoWA events are usually just "message"
     if (eventName !== 'message' && eventName !== 'message.any' && eventName !== 'message.upsert') {
         return res.status(200).json({ status: 'ignored' });
     }
@@ -43,8 +55,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const payload = body.payload || body.data || body;
     const messageId = payload.id || payload.key?.id;
     const fromMe = payload.fromMe || payload.key?.fromMe;
-    const chatId = payload.from || payload.key?.remoteJid;
-    const hasMedia = payload.hasMedia || !!(payload.message?.imageMessage);
+    const chatId = payload.from || payload.key?.remoteJid || payload.chat_id || payload.peer_id;
+    const hasMedia = payload.hasMedia || !!(payload.message?.imageMessage) || !!(payload.image) || !!(payload.file);
 
     if (!chatId || !messageId) {
         return res.status(200).json({ status: 'error', reason: 'malformed_payload' });
@@ -79,33 +91,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // --- 3. Handle Media if present ---
         if (hasMedia) {
             let downloadUrl: string | null = null;
-            if (payload.media?.url) {
-                downloadUrl = payload.media.url.startsWith('http') ? payload.media.url : `${wahaUrl}${payload.media.url}`;
+            let headers: any = {};
+
+            if (engine === 'gowa') {
+                downloadUrl = `${baseUrl}/message/${messageId}/download?phone=${encodeURIComponent(chatId)}`;
+                headers = {
+                    'Authorization': `Basic ${auth}`,
+                    'X-Device-Id': session
+                };
             } else {
-                const msgInfoRes = await fetch(`${wahaUrl}/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${messageId}?downloadMedia=true`, {
-                    headers: { 'X-Api-Key': wahaKey || '' }
-                });
-                if (msgInfoRes.ok) {
-                    const msgInfo = await msgInfoRes.json();
-                    const remoteMediaUrl = msgInfo.media?.url;
-                    if (remoteMediaUrl) {
-                        downloadUrl = remoteMediaUrl.startsWith('http') ? remoteMediaUrl : `${wahaUrl}${remoteMediaUrl}`;
+                // WAHA Logic
+                headers = { 'X-Api-Key': wahaKey || '' };
+                if (payload.media?.url) {
+                    downloadUrl = payload.media.url.startsWith('http') ? payload.media.url : `${baseUrl}${payload.media.url}`;
+                } else {
+                    const msgInfoRes = await fetch(`${baseUrl}/api/${session}/chats/${encodeURIComponent(chatId)}/messages/${messageId}?downloadMedia=true`, {
+                        headers
+                    });
+                    if (msgInfoRes.ok) {
+                        const msgInfo = await msgInfoRes.json();
+                        const remoteMediaUrl = msgInfo.media?.url;
+                        if (remoteMediaUrl) {
+                            downloadUrl = remoteMediaUrl.startsWith('http') ? remoteMediaUrl : `${baseUrl}${remoteMediaUrl}`;
+                        }
                     }
+                }
+
+                if (!downloadUrl) {
+                    downloadUrl = `${baseUrl}/api/${session}/messages/${messageId}/download`;
                 }
             }
 
-            if (!downloadUrl) {
-                downloadUrl = `${wahaUrl}/api/${session}/messages/${messageId}/download`;
-            }
-
-            const mediaResponse = await fetch(downloadUrl!, {
-                headers: { 'X-Api-Key': wahaKey || '' }
-            });
+            const mediaResponse = await fetch(downloadUrl!, { headers });
 
             if (mediaResponse.ok) {
-                const buffer = await mediaResponse.arrayBuffer();
-                base64Image = Buffer.from(buffer).toString('base64');
-                mimeType = mediaResponse.headers.get('content-type') || 'image/jpeg';
+                if (engine === 'gowa') {
+                    const gowaData = await mediaResponse.json();
+                    base64Image = gowaData.data; // GoWA returns base64 in "data" field
+                    mimeType = gowaData.mime_type || 'image/jpeg';
+                } else {
+                    const buffer = await mediaResponse.arrayBuffer();
+                    base64Image = Buffer.from(buffer).toString('base64');
+                    mimeType = mediaResponse.headers.get('content-type') || 'image/jpeg';
+                }
+            } else {
+                console.error(`[WAHA Webhook] Media download failed: ${mediaResponse.status}`, await mediaResponse.text());
             }
         }
 
@@ -233,21 +263,36 @@ ${logStatus}`;
         await new Promise(r => setTimeout(r, 2000));
 
         try {
-            await fetch(`${wahaUrl}/api/sendSeen`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
-                body: JSON.stringify({ chatId, session, messageIds: [messageId] })
-            });
+            if (engine === 'waha') {
+                await fetch(`${baseUrl}/api/sendSeen`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
+                    body: JSON.stringify({ chatId, session, messageIds: [messageId] })
+                });
+            }
         } catch (e) {
             console.warn('[WAHA Webhook] sendSeen failed');
         }
 
-        console.log('[WAHA Webhook] Sending reply...');
-        const replyRes = await fetch(`${wahaUrl}/api/sendText`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
-            body: JSON.stringify({ chatId, text: report, session, linkPreview: true })
-        });
+        console.log(`[WAHA Webhook] Sending reply via ${engine.toUpperCase()}...`);
+        let replyRes;
+        if (engine === 'gowa') {
+            replyRes = await fetch(`${baseUrl}/send/message`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Basic ${auth}`,
+                    'X-Device-Id': session
+                },
+                body: JSON.stringify({ phone: chatId, message: report })
+            });
+        } else {
+            replyRes = await fetch(`${baseUrl}/api/sendText`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Api-Key': wahaKey || '' },
+                body: JSON.stringify({ chatId, text: report, session, linkPreview: true })
+            });
+        }
 
         if (!replyRes.ok) {
             console.error('[WAHA Webhook] Send error:', await replyRes.text());

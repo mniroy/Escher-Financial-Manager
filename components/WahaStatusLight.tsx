@@ -7,7 +7,9 @@ const WahaStatusLight: React.FC = () => {
 
     const checkStatus = async () => {
         try {
-            const res = await fetch('/api/webhook/waha-status');
+            const configObj = JSON.parse(localStorage.getItem('escher_waha_config') || '{}');
+            const encodedConfig = btoa(JSON.stringify(configObj));
+            const res = await fetch(`/api/webhook/waha-status?c=${encodedConfig}`);
             const data = await res.json();
             setStatus(data.status);
             setMessage(data.message);

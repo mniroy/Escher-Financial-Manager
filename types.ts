@@ -90,10 +90,15 @@ export interface Notification {
 }
 
 export interface WahaConfig {
+  engine?: 'waha' | 'gowa';
   apiUrl: string;
-  session: string;
-  allowedIds: string; // Comma separated IDs
+  session: string; // Used for waha session and gowa device id
+  allowedIds: string; // Legacy/General allowed IDs
+  allowedReceiptSenders?: string; // Comma separated IDs
+  allowedIncomeSenders?: string; // Comma separated IDs
   pushSubscription?: any; // To allow the backend to send push notifications
+  gowaUsername?: string;
+  gowaPassword?: string;
 }
 
 export interface IncomeEntry {
