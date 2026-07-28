@@ -376,7 +376,8 @@ ${logStatus}`;
 ${logStatus}`;
             }
         } else {
-            return res.status(200).json({ status: 'ignored', reason: 'no_media_for_receipt' });
+            console.log('[WAHA Webhook] No media for receipt, skipping reply.');
+            return;
         }
 
         // --- 5. Confirmation Reply ---
@@ -394,11 +395,11 @@ ${logStatus}`;
             console.warn('[WAHA Webhook] sendSeen failed');
         }
 
-        // Suppress duplicate WhatsApp replies to the same chat within 60 seconds (prevents double replies on WAHA ack updates/retries)
+        // Suppress duplicate WhatsApp replies to the same chat within 60 seconds (prevents double replies on WAHA retries)
         const replyDedupKey = `${chatId}_${report.trim().substring(0, 100)}`;
         if (isRecentlyReplied(replyDedupKey, 60000)) {
             console.log('[WAHA Webhook] Suppressing duplicate reply within 60s for:', replyDedupKey);
-            return res.status(200).json({ status: 'ignored', reason: 'duplicate_reply_suppressed' });
+            return;
         }
 
         console.log(`[WAHA Webhook] Sending reply via ${engine.toUpperCase()}...`);
@@ -425,10 +426,7 @@ ${logStatus}`;
             console.error('[WAHA Webhook] Send error:', await replyRes.text());
         }
 
-        return res.status(200).json({ success: true });
-
     } catch (error: any) {
         console.error('[WAHA Webhook] Fatal Error:', error);
-        return res.status(500).json({ error: error.message });
     }
 }
