@@ -3,6 +3,34 @@ import { analyzeReceipt, analyzeIncome } from '../_lib/analysis.js';
 import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet, getSheetValues } from '../_lib/google.js';
 import { IncomeEntry } from '../../types';
 
+// In-memory cache to prevent duplicate webhook delivery / retries for the same messageId
+const processedMessageIds = new Set<string>();
+
+const parseSheetAmount = (val: any): number => {
+    if (typeof val === 'number') return Math.round(val);
+    if (typeof val === 'string') {
+        const cleanStr = val.replace(/[,.]00$/, '').replace(/[^0-9]/g, '');
+        return parseInt(cleanStr, 10) || 0;
+    }
+    return 0;
+};
+
+const normalizeMerchant = (m: string): string => {
+    const cleaned = (m || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return cleaned || (m || '').trim().toLowerCase();
+};
+
+const isMerchantMatch = (m1: string, m2: string): boolean => {
+    const n1 = normalizeMerchant(m1);
+    const n2 = normalizeMerchant(m2);
+    if (!n1 || !n2) return false;
+    if (n1 === n2) return true;
+    if (n1.length >= 4 && n2.length >= 4) {
+        return n1.includes(n2) || n2.includes(n1);
+    }
+    return false;
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('[WAHA Webhook] Received request');
 
@@ -64,6 +92,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (fromMe && eventName !== 'message.any') {
         return res.status(200).json({ status: 'ignored' });
+    }
+
+    // When a message is received from others (fromMe: false), WAHA fires both 'message' and 'message.any'.
+    // Ignore 'message.any' for incoming messages to prevent double processing.
+    if (!fromMe && eventName === 'message.any') {
+        return res.status(200).json({ status: 'ignored', reason: 'duplicate_event_message_any' });
+    }
+
+    // Deduplicate webhook retries / duplicate deliveries by messageId
+    if (processedMessageIds.has(messageId)) {
+        console.log('[WAHA Webhook] Duplicate messageId ignored:', messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'duplicate_message_id' });
+    }
+    processedMessageIds.add(messageId);
+    if (processedMessageIds.size > 500) {
+        const first = processedMessageIds.values().next().value;
+        if (first) processedMessageIds.delete(first);
     }
 
     // Determine message type and sender authorization
@@ -201,66 +246,109 @@ ${logStatus}`;
 
             const analysis = await analyzeReceipt(base64Image, mimeType!, geminiKey!, customCategories);
 
+            let isDuplicate = false;
+            let existingDate = '';
+            let existingCategory = '';
+
             if (userConfig.rt && userConfig.sid) {
                 try {
                     if (!googleToken) {
                         googleToken = await refreshGoogleToken(userConfig.rt);
                     }
-                    const dateParts = (analysis.date || new Date().toISOString().split('T')[0]).split('-');
-                    const rootId = await findOrCreateFolder(googleToken, 'Escher Finance Manager');
-                    const yearId = await findOrCreateFolder(googleToken, dateParts[0], rootId);
-                    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                    const monthName = months[parseInt(dateParts[1]) - 1] || 'Unknown';
-                    const monthId = await findOrCreateFolder(googleToken, monthName, yearId);
 
-                    const fileName = `receipt-${analysis.date}-${analysis.merchant.toLowerCase().replace(/[^a-z0-9]/g, '-')}.jpg`;
-                    const receiptUrl = await uploadToDrive(googleToken, monthId, base64Image, fileName, mimeType!);
-
-                    // Check for active Period Modes
-                    let appliedPeriod = '';
+                    // Check if this receipt was already entered in Expenses sheet
                     try {
-                        const periods = await getSheetValues(googleToken, userConfig.sid!, 'PeriodModes!A2:D');
-                        const txDate = new Date(analysis.date);
-                        for (const row of periods) {
-                            // Row: [0:ID, 1:StartDate, 2:EndDate, 3:TargetPlan]
-                            if (row.length >= 4) {
-                                const startDate = new Date(row[1]);
-                                const endDate = new Date(row[2]);
-                                if (txDate >= startDate && txDate <= endDate) {
-                                    appliedPeriod = row[3]; // Target Plan Name
-                                    break;
-                                }
+                        const existingExpenses = await getSheetValues(googleToken, userConfig.sid, 'Expenses!A2:G');
+                        const targetAmount = Math.round(analysis.amount || 0);
+                        const targetDate = String(analysis.date || '').trim();
+
+                        for (const row of existingExpenses) {
+                            if (!row || row.length < 5) continue;
+                            const rowDate = String(row[1] || '').trim();
+                            const rowCategory = String(row[2] || '').trim();
+                            const rowMerchant = String(row[3] || '');
+                            const rowAmount = parseSheetAmount(row[4]);
+
+                            if (rowDate === targetDate && rowAmount === targetAmount && isMerchantMatch(rowMerchant, analysis.merchant)) {
+                                isDuplicate = true;
+                                existingDate = rowDate;
+                                existingCategory = rowCategory || analysis.category;
+                                break;
                             }
                         }
                     } catch (e) {
-                        console.warn('[WAHA Webhook] Failed to fetch periods:', e);
+                        console.warn('[WAHA Webhook] Failed to check existing expenses for duplicates:', e);
                     }
 
-                    const id = `${analysis.date.replace(/-/g, '')}-${analysis.category.replace(/\s+/g, '')}-${analysis.merchant.toLowerCase().substring(0, 10)}`;
-                    await appendToSheet(googleToken, userConfig.sid, 'Expenses!A2', [
-                        id, analysis.date, analysis.category, analysis.merchant, analysis.amount, receiptUrl, appliedPeriod
-                    ]);
-                    logStatus = '✅ Logged to Expenses & Drive' + (appliedPeriod ? ` (Period: ${appliedPeriod})` : '');
+                    if (isDuplicate) {
+                        console.log(`[WAHA Webhook] Duplicate receipt detected for merchant "${analysis.merchant}" on ${existingDate}`);
+                        logStatus = `⚠️ Already entered on date ${existingDate}`;
+                    } else {
+                        const dateParts = (analysis.date || new Date().toISOString().split('T')[0]).split('-');
+                        const rootId = await findOrCreateFolder(googleToken, 'Escher Finance Manager');
+                        const yearId = await findOrCreateFolder(googleToken, dateParts[0], rootId);
+                        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                        const monthName = months[parseInt(dateParts[1]) - 1] || 'Unknown';
+                        const monthId = await findOrCreateFolder(googleToken, monthName, yearId);
+
+                        const fileName = `receipt-${analysis.date}-${analysis.merchant.toLowerCase().replace(/[^a-z0-9]/g, '-')}.jpg`;
+                        const receiptUrl = await uploadToDrive(googleToken, monthId, base64Image, fileName, mimeType!);
+
+                        // Check for active Period Modes
+                        let appliedPeriod = '';
+                        try {
+                            const periods = await getSheetValues(googleToken, userConfig.sid!, 'PeriodModes!A2:D');
+                            const txDate = new Date(analysis.date);
+                            for (const row of periods) {
+                                // Row: [0:ID, 1:StartDate, 2:EndDate, 3:TargetPlan]
+                                if (row.length >= 4) {
+                                    const startDate = new Date(row[1]);
+                                    const endDate = new Date(row[2]);
+                                    if (txDate >= startDate && txDate <= endDate) {
+                                        appliedPeriod = row[3]; // Target Plan Name
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[WAHA Webhook] Failed to fetch periods:', e);
+                        }
+
+                        const id = `${analysis.date.replace(/-/g, '')}-${analysis.category.replace(/\s+/g, '')}-${analysis.merchant.toLowerCase().substring(0, 10)}`;
+                        await appendToSheet(googleToken, userConfig.sid, 'Expenses!A2', [
+                            id, analysis.date, analysis.category, analysis.merchant, analysis.amount, receiptUrl, appliedPeriod
+                        ]);
+                        logStatus = '✅ Logged to Expenses & Drive' + (appliedPeriod ? ` (Period: ${appliedPeriod})` : '');
+                    }
                 } catch (err: any) {
                     console.error('[WAHA Webhook] Receipt Logging Error:', err);
                     logStatus = `⚠️ Logging Failed: ${err.message}`;
                 }
             }
 
-            report = `📄 *Receipt Analyzed*
+            if (isDuplicate) {
+                report = `⚠️ *Receipt Already Entered*
+💰 Rp ${analysis.amount.toLocaleString('id-ID')}
+🏪 ${analysis.merchant}
+📅 ${existingDate || analysis.date}
+📂 ${existingCategory || analysis.category}
+
+ℹ️ Already entered on date ${existingDate || analysis.date}. Previous entry preserved.`;
+            } else {
+                report = `📄 *Receipt Analyzed*
 💰 Rp ${analysis.amount.toLocaleString('id-ID')}
 🏪 ${analysis.merchant}
 📅 ${analysis.date}
 📂 ${analysis.category}
 
 ${logStatus}`;
+            }
         } else {
             return res.status(200).json({ status: 'ignored', reason: 'no_media_for_receipt' });
         }
 
         // --- 5. Confirmation Reply ---
-        console.log('[WAHA Webhook] Step 5: Waiting 2s before reply...');
-        await new Promise(r => setTimeout(r, 2000));
+        console.log('[WAHA Webhook] Step 5: Preparing reply...');
 
         try {
             if (engine === 'waha') {
