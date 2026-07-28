@@ -155,20 +155,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('[WAHA Webhook] Image detected:', messageId);
 
-    // Persistent Cross-Instance Concurrency Lock using Google Sheets
+    // Persistent Cross-Instance Deduplication Lock using Google Sheets
+    // Strategy: WRITE the messageId first (both instances write), then READ back and count.
+    // If count > 1, we are the duplicate — bail out. This avoids the read-before-write race condition.
     if (userConfig.rt && userConfig.sid) {
         try {
-            const token = await refreshGoogleToken(userConfig.rt);
-            const locks = await getSheetValues(token, userConfig.sid, 'Locks!A2:A');
-            const isLocked = locks.some((row: any[]) => row && row[0] === messageId);
-            if (isLocked) {
-                console.log('[WAHA Webhook] Message ID already locked in Google Sheets:', messageId);
-                return res.status(200).json({ status: 'ignored', reason: 'message_locked_in_sheets' });
+            const lockToken = await refreshGoogleToken(userConfig.rt);
+            // Step 1: Write this messageId + timestamp immediately
+            await appendToSheet(lockToken, userConfig.sid, 'Locks!A2', [messageId, new Date().toISOString(), chatId]);
+            // Step 2: Small delay to allow any concurrent Lambda writing at the same time to land
+            await new Promise(r => setTimeout(r, 2500));
+            // Step 3: Read back all locks and count how many times this messageId was written
+            const locks = await getSheetValues(lockToken, userConfig.sid, 'Locks!A2:A');
+            const lockCount = locks.filter((row: any[]) => row && row[0] === messageId).length;
+            if (lockCount > 1) {
+                console.log(`[WAHA Webhook] Duplicate detected via Sheets lock (count=${lockCount}) for messageId:`, messageId);
+                return res.status(200).json({ status: 'ignored', reason: 'sheets_lock_duplicate' });
             }
-            // Claim lock immediately before running AI / media processing
-            await appendToSheet(token, userConfig.sid, 'Locks!A2', [messageId, new Date().toISOString()]);
+            console.log('[WAHA Webhook] Sheets lock claimed for messageId:', messageId);
         } catch (lockError) {
-            console.warn('[WAHA Webhook] Google Sheets lock check failed:', lockError);
+            console.warn('[WAHA Webhook] Google Sheets lock failed, proceeding:', lockError);
         }
     }
 
