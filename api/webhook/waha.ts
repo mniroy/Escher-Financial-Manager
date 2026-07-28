@@ -155,6 +155,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('[WAHA Webhook] Image detected:', messageId);
 
+    // Persistent Cross-Instance Concurrency Lock using Google Sheets
+    if (userConfig.rt && userConfig.sid) {
+        try {
+            const token = await refreshGoogleToken(userConfig.rt);
+            const locks = await getSheetValues(token, userConfig.sid, 'Locks!A2:A');
+            const isLocked = locks.some((row: any[]) => row && row[0] === messageId);
+            if (isLocked) {
+                console.log('[WAHA Webhook] Message ID already locked in Google Sheets:', messageId);
+                return res.status(200).json({ status: 'ignored', reason: 'message_locked_in_sheets' });
+            }
+            // Claim lock immediately before running AI / media processing
+            await appendToSheet(token, userConfig.sid, 'Locks!A2', [messageId, new Date().toISOString()]);
+        } catch (lockError) {
+            console.warn('[WAHA Webhook] Google Sheets lock check failed:', lockError);
+        }
+    }
+
     try {
         const geminiKey = process.env.API_KEY;
         let base64Image: string | null = null;
