@@ -91,11 +91,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = req.body;
     const eventName = body.event;
 
-    // GoWA events are usually just "message"
-    if (eventName !== 'message' && eventName !== 'message.any' && eventName !== 'message.upsert') {
-        return res.status(200).json({ status: 'ignored' });
-    }
-
     const payload = body.payload || body.data || body;
     const messageId = payload.id || payload.key?.id;
     const fromMe = payload.fromMe || payload.key?.fromMe;
@@ -106,30 +101,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ status: 'error', reason: 'malformed_payload' });
     }
 
-    // Strict WAHA Event Name Filtering:
-    // - For incoming messages (!fromMe): WAHA fires 'message', 'message.any', and 'message.upsert'. Only allow 'message'.
-    // - For outgoing messages (fromMe): WAHA fires 'message.any' and 'message.upsert'. Only allow 'message.any'.
-    if (!fromMe && eventName !== 'message') {
-        console.log(`[WAHA Webhook] Ignoring event "${eventName}" for incoming message:`, messageId);
-        return res.status(200).json({ status: 'ignored', reason: 'incoming_only_message' });
-    }
-    if (fromMe && eventName !== 'message.any') {
-        console.log(`[WAHA Webhook] Ignoring event "${eventName}" for fromMe message:`, messageId);
-        return res.status(200).json({ status: 'ignored', reason: 'fromme_only_message_any' });
+    // Strict WAHA Event Name & Sender Filtering:
+    // WAHA fires 'message', 'message.any', and 'message.upsert' for the same message.
+    // ONLY process 'message' event. Ignore all others ('message.any', 'message.upsert', etc.) to prevent duplicate execution.
+    if (eventName && eventName !== 'message') {
+        console.log(`[WAHA Webhook] Ignoring non-message event "${eventName}" for messageId:`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'only_message_event_allowed' });
     }
 
-    // Strict ACK Status Filtering:
-    // - For outgoing messages (fromMe), WAHA fires message.any on every ack change (0 -> 1 -> 2 -> 3).
-    //   Only process the initial message creation where ack is 0 or undefined. Ignore ack >= 1.
-    // - For incoming messages (!fromMe), ignore any status update where ack >= 2.
-    const ack = payload.ack ?? payload.key?.ack ?? body.ack;
-    if (fromMe && typeof ack === 'number' && ack >= 1) {
-        console.log(`[WAHA Webhook] Ignoring fromMe ack status update (ack=${ack}):`, messageId);
-        return res.status(200).json({ status: 'ignored', reason: 'fromme_ack_update' });
+    // Never process messages sent by the bot itself (fromMe === true when engine is WAHA)
+    if (fromMe && engine === 'waha') {
+        console.log(`[WAHA Webhook] Ignoring outgoing message (fromMe=true):`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'fromme_ignored' });
     }
-    if (!fromMe && typeof ack === 'number' && ack >= 2) {
-        console.log(`[WAHA Webhook] Ignoring incoming ack status update (ack=${ack}):`, messageId);
-        return res.status(200).json({ status: 'ignored', reason: 'incoming_ack_update' });
+
+    // Strict ACK Status Filtering: ignore any ACK delivery/read status updates (ack >= 1)
+    const ack = payload.ack ?? payload.key?.ack ?? body.ack;
+    if (typeof ack === 'number' && ack >= 1) {
+        console.log(`[WAHA Webhook] Ignoring ack status update (ack=${ack}):`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'ack_update_ignored' });
     }
 
     // Deduplicate webhook retries / duplicate deliveries by messageId and timestamp
