@@ -153,38 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ status: 'ignored' });
     }
 
-    console.log('[WAHA Webhook] Image detected:', messageId);
-
-    // Persistent Cross-Instance Deduplication Lock using Google Sheets
-    // Strategy: WRITE the messageId + a per-instance nonce first, then READ back ALL rows.
-    //   - The FIRST row (lowest index) for this messageId is the winner and continues.
-    //   - All other instances (duplicates) bail out immediately.
-    const instanceNonce = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    if (userConfig.rt && userConfig.sid) {
-        try {
-            const lockToken = await refreshGoogleToken(userConfig.rt);
-            // Step 1: Write this instance's claim immediately
-            await appendToSheet(lockToken, userConfig.sid, 'Locks!A2', [messageId, new Date().toISOString(), instanceNonce]);
-            // Step 2: Short delay so any concurrent Lambda finishes its write
-            await new Promise(r => setTimeout(r, 2000));
-            // Step 3: Read back all lock rows for this messageId and find the winning nonce (first by row order = first appended)
-            const allLocks = await getSheetValues(lockToken, userConfig.sid, 'Locks!A2:C');
-            const myLockRows = allLocks.filter((row: any[]) => row && row[0] === messageId);
-            if (myLockRows.length > 1) {
-                // Find the first row's nonce — that is the winner
-                const winnerNonce = myLockRows[0][2];
-                if (winnerNonce !== instanceNonce) {
-                    console.log(`[WAHA Webhook] Duplicate — yielding to winner nonce=${winnerNonce} for messageId:`, messageId);
-                    return res.status(200).json({ status: 'ignored', reason: 'sheets_lock_duplicate_yield' });
-                }
-                console.log('[WAHA Webhook] Winner — proceeding for messageId:', messageId);
-            } else {
-                console.log('[WAHA Webhook] Sole instance for messageId:', messageId);
-            }
-        } catch (lockError) {
-            console.warn('[WAHA Webhook] Google Sheets lock failed, proceeding:', lockError);
-        }
-    }
+    console.log('[WAHA Webhook] Processing messageId:', messageId, '| event:', eventName, '| fromMe:', fromMe);
 
     try {
         const geminiKey = process.env.API_KEY;
