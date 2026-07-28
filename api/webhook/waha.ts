@@ -101,25 +101,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ status: 'error', reason: 'malformed_payload' });
     }
 
-    // Strict WAHA Event Name & Sender Filtering:
-    // WAHA fires 'message', 'message.any', and 'message.upsert' for the same message.
-    // ONLY process 'message' event. Ignore all others ('message.any', 'message.upsert', etc.) to prevent duplicate execution.
-    if (eventName && eventName !== 'message') {
-        console.log(`[WAHA Webhook] Ignoring non-message event "${eventName}" for messageId:`, messageId);
-        return res.status(200).json({ status: 'ignored', reason: 'only_message_event_allowed' });
+    // WAHA Webhook Event Deduplication Rules:
+    // 1. For incoming messages from others (!fromMe): WAHA fires both 'message' and 'message.any'.
+    //    We ONLY process 'message' and ignore 'message.any' to avoid double processing.
+    // 2. For outgoing messages sent by self/bot (fromMe): WAHA fires 'message.any' on creation (ack=0 or undefined)
+    //    and on every ACK change (ack=1, ack=2). We ONLY process 'message.any' when ack is 0 or undefined.
+    if (!fromMe && eventName !== 'message') {
+        console.log(`[WAHA Webhook] Ignoring event "${eventName}" for incoming message:`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'incoming_requires_message_event' });
+    }
+    if (fromMe && eventName !== 'message.any') {
+        console.log(`[WAHA Webhook] Ignoring event "${eventName}" for outgoing message:`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'outgoing_requires_message_any_event' });
     }
 
-    // Never process messages sent by the bot itself (fromMe === true when engine is WAHA)
-    if (fromMe && engine === 'waha') {
-        console.log(`[WAHA Webhook] Ignoring outgoing message (fromMe=true):`, messageId);
-        return res.status(200).json({ status: 'ignored', reason: 'fromme_ignored' });
-    }
-
-    // Strict ACK Status Filtering: ignore any ACK delivery/read status updates (ack >= 1)
+    // Ignore ACK status updates (when WAHA notifies that a sent message reached server/device/read, ack >= 1)
     const ack = payload.ack ?? payload.key?.ack ?? body.ack;
-    if (typeof ack === 'number' && ack >= 1) {
-        console.log(`[WAHA Webhook] Ignoring ack status update (ack=${ack}):`, messageId);
-        return res.status(200).json({ status: 'ignored', reason: 'ack_update_ignored' });
+    if (fromMe && typeof ack === 'number' && ack >= 1) {
+        console.log(`[WAHA Webhook] Ignoring ack status update (ack=${ack}) for messageId:`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'fromme_ack_update_ignored' });
+    }
+    if (!fromMe && typeof ack === 'number' && ack >= 2) {
+        console.log(`[WAHA Webhook] Ignoring incoming ack status update (ack=${ack}) for messageId:`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'incoming_ack_update_ignored' });
     }
 
     // Deduplicate webhook retries / duplicate deliveries by messageId and timestamp
