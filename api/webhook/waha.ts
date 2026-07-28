@@ -155,6 +155,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('[WAHA Webhook] Processing messageId:', messageId, '| event:', eventName, '| fromMe:', fromMe);
 
+    // IMPORTANT: Respond 200 to WAHA immediately BEFORE the slow Gemini/Drive processing.
+    // This prevents WAHA from timing out and retrying the webhook (which causes double entries).
+    // Vercel will keep the function alive until the async work below finishes.
+    res.status(200).json({ status: 'processing' });
+
     try {
         const geminiKey = process.env.API_KEY;
         let base64Image: string | null = null;
