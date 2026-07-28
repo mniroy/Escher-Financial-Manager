@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { analyzeReceipt, analyzeIncome } from '../_lib/analysis.js';
-import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet, getSheetValues } from '../_lib/google.js';
+import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet, getSheetValues, ensureSheetExists } from '../_lib/google.js';
 import { IncomeEntry } from '../../types';
 
 // In-memory caches to prevent duplicate webhook delivery, retries, and duplicate WhatsApp replies
@@ -155,10 +155,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     console.log('[WAHA Webhook] Processing messageId:', messageId, '| event:', eventName, '| fromMe:', fromMe);
 
-    // IMPORTANT: Respond 200 to WAHA immediately BEFORE the slow Gemini/Drive processing.
-    // This prevents WAHA from timing out and retrying the webhook (which causes double entries).
-    // Vercel will keep the function alive until the async work below finishes.
-    res.status(200).json({ status: 'processing' });
+    // Persistent Cross-Instance Deduplication using Google Sheets (auto-creates Locks sheet if needed)
+    // Write-First pattern: both instances write a nonce, wait 2s, then check who wrote first.
+    // First row (lowest row number) = winner. Others bail out.
+    if (userConfig.rt && userConfig.sid) {
+        const lockNonce = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        try {
+            const lockToken = await refreshGoogleToken(userConfig.rt);
+            // Auto-create the Locks sheet if it doesn't exist
+            await ensureSheetExists(lockToken, userConfig.sid, 'Locks');
+            // Step 1: Write this instance's claim entry and get the row number it landed on
+            const myRow = await appendToSheet(lockToken, userConfig.sid, 'Locks!A2', [messageId, lockNonce, new Date().toISOString()]);
+            console.log(`[WAHA Webhook] Lock entry written at row ${myRow} with nonce ${lockNonce}`);
+            // Step 2: Wait 2s for any concurrent instance to also write its claim
+            await new Promise(r => setTimeout(r, 2000));
+            // Step 3: Read all lock entries for this messageId
+            const allLocks = await getSheetValues(lockToken, userConfig.sid, 'Locks!A2:C');
+            const msgLocks = allLocks.filter(row => row && row[0] === messageId);
+            if (msgLocks.length > 1) {
+                // Multiple instances raced. Winner = the one with the earliest (lowest) row index.
+                // The first row in msgLocks corresponds to the earliest append (Google Sheets serializes appends).
+                const winnerNonce = msgLocks[0][1];
+                if (winnerNonce !== lockNonce) {
+                    console.log(`[WAHA Webhook] Yielding to winner nonce=${winnerNonce}. Skipping processing for messageId:`, messageId);
+                    return res.status(200).json({ status: 'ignored', reason: 'lock_yield_to_winner' });
+                }
+                console.log(`[WAHA Webhook] Winner! Proceeding for messageId:`, messageId);
+            }
+        } catch (lockErr) {
+            // Lock failed (network, permissions, etc.) — proceed anyway but log it
+            console.warn('[WAHA Webhook] Sheets lock failed, proceeding without lock:', lockErr);
+        }
+    }
 
     try {
         const geminiKey = process.env.API_KEY;

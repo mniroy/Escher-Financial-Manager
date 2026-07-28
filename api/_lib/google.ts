@@ -169,7 +169,7 @@ export async function uploadToDrive(token: string, folderId: string, base64: str
     return `https://drive.google.com/file/d/${fileId}/view`;
 }
 
-export async function appendToSheet(token: string, spreadsheetId: string, range: string, values: any[]) {
+export async function appendToSheet(token: string, spreadsheetId: string, range: string, values: any[]): Promise<number | null> {
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`;
     const response = await fetchWithRetry(url, {
         method: 'POST',
@@ -183,6 +183,26 @@ export async function appendToSheet(token: string, spreadsheetId: string, range:
     if (!response.ok) {
         throw new Error(`Sheet Append Error: ${await response.text()}`);
     }
+
+    // Parse the row number from updatedRange (e.g. "Expenses!A52:G52" → 52)
+    const data = await response.json();
+    const updatedRange: string = data.updates?.updatedRange || '';
+    const rowMatch = updatedRange.match(/!(\w+)(\d+)/);
+    return rowMatch ? parseInt(rowMatch[2], 10) : null;
+}
+
+export async function ensureSheetExists(token: string, spreadsheetId: string, sheetTitle: string): Promise<void> {
+    // Check if sheet exists
+    const checkUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(sheetTitle)}!A1`;
+    const checkRes = await fetchWithRetry(checkUrl, { headers: { Authorization: `Bearer ${token}` } });
+    if (checkRes.ok || checkRes.status !== 400) return; // Sheet exists
+    // Create the sheet
+    const createUrl = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`;
+    await fetchWithRetry(createUrl, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: [{ addSheet: { properties: { title: sheetTitle } } }] })
+    });
 }
 
 export async function getSheetValues(token: string, spreadsheetId: string, range: string): Promise<any[][]> {
