@@ -3,8 +3,24 @@ import { analyzeReceipt, analyzeIncome } from '../_lib/analysis.js';
 import { refreshGoogleToken, findOrCreateFolder, uploadToDrive, appendToSheet, getSheetValues } from '../_lib/google.js';
 import { IncomeEntry } from '../../types';
 
-// In-memory cache to prevent duplicate webhook delivery / retries for the same messageId
+// In-memory caches to prevent duplicate webhook delivery, retries, and duplicate WhatsApp replies
 const processedMessageIds = new Set<string>();
+const recentReplies = new Map<string, number>();
+
+const isRecentlyReplied = (key: string, ttlMs = 60000): boolean => {
+    const now = Date.now();
+    const last = recentReplies.get(key);
+    if (last && now - last < ttlMs) {
+        return true;
+    }
+    recentReplies.set(key, now);
+    if (recentReplies.size > 200) {
+        for (const [k, t] of recentReplies.entries()) {
+            if (now - t >= ttlMs) recentReplies.delete(k);
+        }
+    }
+    return false;
+};
 
 const parseSheetAmount = (val: any): number => {
     if (typeof val === 'number') return Math.round(val);
@@ -90,22 +106,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ status: 'error', reason: 'malformed_payload' });
     }
 
+    // Strict WAHA Event Name Filtering:
+    // - For incoming messages (!fromMe): WAHA fires 'message', 'message.any', and 'message.upsert'. Only allow 'message'.
+    // - For outgoing messages (fromMe): WAHA fires 'message.any' and 'message.upsert'. Only allow 'message.any'.
+    if (!fromMe && eventName !== 'message') {
+        console.log(`[WAHA Webhook] Ignoring event "${eventName}" for incoming message:`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'incoming_only_message' });
+    }
     if (fromMe && eventName !== 'message.any') {
-        return res.status(200).json({ status: 'ignored' });
+        console.log(`[WAHA Webhook] Ignoring event "${eventName}" for fromMe message:`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'fromme_only_message_any' });
     }
 
-    // When a message is received from others (fromMe: false), WAHA fires both 'message' and 'message.any'.
-    // Ignore 'message.any' for incoming messages to prevent double processing.
-    if (!fromMe && eventName === 'message.any') {
-        return res.status(200).json({ status: 'ignored', reason: 'duplicate_event_message_any' });
+    // Strict ACK Status Filtering:
+    // - For outgoing messages (fromMe), WAHA fires message.any on every ack change (0 -> 1 -> 2 -> 3).
+    //   Only process the initial message creation where ack is 0 or undefined. Ignore ack >= 1.
+    // - For incoming messages (!fromMe), ignore any status update where ack >= 2.
+    const ack = payload.ack ?? payload.key?.ack ?? body.ack;
+    if (fromMe && typeof ack === 'number' && ack >= 1) {
+        console.log(`[WAHA Webhook] Ignoring fromMe ack status update (ack=${ack}):`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'fromme_ack_update' });
+    }
+    if (!fromMe && typeof ack === 'number' && ack >= 2) {
+        console.log(`[WAHA Webhook] Ignoring incoming ack status update (ack=${ack}):`, messageId);
+        return res.status(200).json({ status: 'ignored', reason: 'incoming_ack_update' });
     }
 
-    // Deduplicate webhook retries / duplicate deliveries by messageId
-    if (processedMessageIds.has(messageId)) {
-        console.log('[WAHA Webhook] Duplicate messageId ignored:', messageId);
+    // Deduplicate webhook retries / duplicate deliveries by messageId and timestamp
+    const dedupKey = `${chatId}_${messageId}`;
+    if (processedMessageIds.has(dedupKey)) {
+        console.log('[WAHA Webhook] Duplicate messageId ignored:', dedupKey);
         return res.status(200).json({ status: 'ignored', reason: 'duplicate_message_id' });
     }
-    processedMessageIds.add(messageId);
+    processedMessageIds.add(dedupKey);
     if (processedMessageIds.size > 500) {
         const first = processedMessageIds.values().next().value;
         if (first) processedMessageIds.delete(first);
@@ -360,6 +393,13 @@ ${logStatus}`;
             }
         } catch (e) {
             console.warn('[WAHA Webhook] sendSeen failed');
+        }
+
+        // Suppress duplicate WhatsApp replies to the same chat within 60 seconds (prevents double replies on WAHA ack updates/retries)
+        const replyDedupKey = `${chatId}_${report.trim().substring(0, 100)}`;
+        if (isRecentlyReplied(replyDedupKey, 60000)) {
+            console.log('[WAHA Webhook] Suppressing duplicate reply within 60s for:', replyDedupKey);
+            return res.status(200).json({ status: 'ignored', reason: 'duplicate_reply_suppressed' });
         }
 
         console.log(`[WAHA Webhook] Sending reply via ${engine.toUpperCase()}...`);
